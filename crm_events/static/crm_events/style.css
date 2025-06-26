@@ -1,0 +1,195 @@
+/* crm_events/static/crm_events/style.css */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background-color: #f4f7f6;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+h1, h2 {
+    color: #2c3e50;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.filters-card {
+    background-color: #ecf0f1;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.filter-group label {
+    font-weight: bold;
+    color: #555;
+    white-space: nowrap;
+}
+
+.filter-group input[type="text"],
+.filter-group input[type="number"],
+.filter-group select {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    min-width: 150px;
+    box-sizing: border-box;
+}
+
+.filter-group input[type="number"] {
+    width: 80px; /* Smaller for number inputs */
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+    margin-right: 10px;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button#clearFilters {
+    background-color: #e74c3c;
+}
+
+button#clearFilters:hover {
+    background-color: #c0392b;
+}
+
+.user-list-section {
+    padding-top: 20px;
+}
+
+/* TABLE STYLES */
+.table-responsive {
+    overflow-x: auto; /* Cho phép cuộn ngang nếu bảng quá rộng */
+    margin-bottom: 20px;
+    border: 1px solid #ddd; /* Add border around the table */
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    background-color: #fff;
+}
+
+.user-table {
+    width: 100%;
+    border-collapse: collapse; /* Xóa khoảng trống giữa các ô */
+    min-width: 700px; /* Đảm bảo bảng không quá nhỏ trên màn hình hẹp */
+}
+
+.user-table th,
+.user-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0; /* Đường kẻ dưới mỗi hàng */
+}
+
+.user-table th {
+    background-color: #34495e; /* Màu nền cho tiêu đề bảng */
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+.user-table tbody tr:nth-child(even) {
+    background-color: #f8f8f8; /* Màu nền xen kẽ cho các hàng */
+}
+
+.user-table tbody tr:hover {
+    background-color: #eef; /* Hiệu ứng hover */
+    cursor: pointer;
+}
+
+.user-table td {
+    font-size: 0.95em;
+    color: #555;
+}
+
+/* END TABLE STYLES */
+
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+    gap: 15px;
+}
+
+.pagination button {
+    padding: 8px 15px;
+    font-size: 1em;
+}
+
+.pagination button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.pagination span {
+    font-size: 1.1em;
+    font-weight: bold;
+    color: #555;
+}
+
+#loadingMessage, #noUsersMessage {
+    text-align: center;
+    font-style: italic;
+    color: #777;
+    padding: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .filter-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-group input,
+    .filter-group select {
+        width: 100%;
+        min-width: unset;
+    }
+    .filter-group button {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+    /* For tables on small screens */
+    .table-responsive {
+        width: 100%;
+        overflow-x: auto; /* Ensures horizontal scrolling if table content overflows */
+        -webkit-overflow-scrolling: touch; /* For smoother scrolling on iOS */
+    }
+    .user-table {
+        min-width: 600px; /* Keep a minimum width to prevent squishing */
+    }
+}

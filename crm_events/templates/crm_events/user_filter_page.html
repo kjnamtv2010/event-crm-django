@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Filter & List</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'crm_events/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>User Directory</h1>
+
+        <div class="filters-card">
+            <h2>Filter Users</h2>
+            <div class="filter-group">
+                <input type="text" id="companyFilter" placeholder="Company">
+                <input type="text" id="jobTitleFilter" placeholder="Job Title">
+            </div>
+            <div class="filter-group">
+                <input type="text" id="cityFilter" placeholder="City">
+                <input type="text" id="stateFilter" placeholder="State">
+            </div>
+            <div class="filter-group">
+                <label for="hostingMin">Hosted Events (Min):</label>
+                <input type="number" id="hostingMin" placeholder="Min" min="0">
+                <label for="hostingMax">Hosted Events (Max):</label>
+                <input type="number" id="hostingMax" placeholder="Max" min="0">
+            </div>
+            <div class="filter-group">
+                <label for="registeredMin">Attended Events (Min):</label>
+                <input type="number" id="registeredMin" placeholder="Min" min="0">
+                <label for="registeredMax">Attended Events (Max):</label>
+                <input type="number" id="registeredMax" placeholder="Max" min="0">
+            </div>
+            <div class="filter-group">
+                <label for="sortBy">Sort By:</label>
+                <select id="sortBy">
+                    <option value="username">Username (Asc)</option>
+                    <option value="-username">Username (Desc)</option>
+                    <option value="email">Email (Asc)</option>
+                    <option value="-email">Email (Desc)</option>
+                    <option value="company">Company (Asc)</option>
+                    <option value="-company">Company (Desc)</option>
+                    <option value="total_hosting_events">Hosted Events (Asc)</option>
+                    <option value="-total_hosting_events">Hosted Events (Desc)</option>
+                    <option value="total_registered_events">Attended Events (Asc)</option>
+                    <option value="-total_registered_events">Attended Events (Desc)</option>
+                </select>
+            </div>
+            <button id="applyFilters">Apply Filters</button>
+            <button id="clearFilters">Clear Filters</button>
+        </div>
+
+        <div class="user-list-section">
+            <h2>Users</h2>
+            <div class="table-responsive"> {# Thêm div này để responsive table #}
+                <table id="userTable" class="user-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Company</th>
+                            <th>Job Title</th>
+                            <th>City, State</th>
+                            <th>Hosted Events</th>
+                            <th>Attended Events</th>
+                            <th>Joined Date</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userListBody">
+                        </tbody>
+                </table>
+            </div>
+            <p id="loadingMessage">Loading users...</p>
+            <p id="noUsersMessage" style="display: none;">No users found matching your criteria.</p>
+
+            <div class="pagination">
+                <button id="prevPage" disabled>&laquo; Previous</button>
+                <span id="pageInfo">Page 1</span>
+                <button id="nextPage">&raquo; Next</button>
+                <label for="pageSizeSelect">Items per page:</label>
+                <select id="pageSizeSelect">
+                    <option value="5">5</option>
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="{% static 'crm_events/script.js' %}"></script>
+</body>
+</html>
