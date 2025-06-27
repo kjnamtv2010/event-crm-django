@@ -1,5 +1,4 @@
 $(document).ready(function() {
-    // --- Khai báo biến DOM elements (chung cho cả trang và modal) ---
     var companyFilter = $('#companyFilter');
     var jobTitleFilter = $('#jobTitleFilter');
     var cityFilter = $('#cityFilter');
@@ -19,27 +18,23 @@ $(document).ready(function() {
     var pageInfo = $('#pageInfo');
     var pageSizeSelect = $('#pageSizeSelect');
 
-    // --- Biến cho Pagination và Filter State ---
     var currentPage = 1;
     var currentFilters = {};
     var currentSort = sortBy.val();
-    var currentSearch = ''; // Thêm biến search nếu có
+    var currentSearch = '';
 
-    // --- Modal Elements ---
     var emailModal = $("#emailModal");
     var openEmailModalBtn = $("#openEmailModalBtn");
     var closeButton = $(".close-button");
     var sendEmailBtnModal = $("#sendEmailBtnModal");
     var emailSubjectModal = $("#emailSubjectModal");
     var emailBodyModal = $("#emailBodyModal");
-    var emailHtmlBodyModal = $("#emailHtmlBodyModal");
     var emailStatusMessageModal = $("#emailStatusMessageModal");
 
 
-    // --- Hàm Fetch Users ---
     function fetchUsers() {
         loadingMessage.show();
-        userListBody.empty(); // Clear previous users
+        userListBody.empty();
         noUsersMessage.hide();
 
         var params = {
@@ -48,7 +43,6 @@ $(document).ready(function() {
             ordering: currentSort
         };
 
-        // Thêm các filter vào params
         if (currentFilters.company) params.company = currentFilters.company;
         if (currentFilters.job_title) params.job_title = currentFilters.job_title;
         if (currentFilters.city) params.city = currentFilters.city;
@@ -57,12 +51,11 @@ $(document).ready(function() {
         if (currentFilters.total_hosting_events_max) params.total_hosting_events_max = currentFilters.total_hosting_events_max;
         if (currentFilters.total_registered_events_min) params.total_registered_events_min = currentFilters.total_registered_events_min;
         if (currentFilters.total_registered_events_max) params.total_registered_events_max = currentFilters.total_registered_events_max;
-        // Thêm currentSearch nếu bạn có một trường tìm kiếm chung
         if (currentSearch) params.search = currentSearch;
 
 
         $.ajax({
-            url: '/api/crm/users/', // Đảm bảo URL này đúng với API endpoint của bạn
+            url: '/api/crm/users/',
             method: 'GET',
             dataType: 'json',
             data: params,
@@ -99,38 +92,31 @@ $(document).ready(function() {
         });
     }
 
-    // --- Hàm Apply Filters ---
     function applyFilters() {
         currentFilters = {
-            // Sử dụng .trim() cho các trường kiểu văn bản
             company: companyFilter.val().trim(),
             job_title: jobTitleFilter.val().trim(),
             city: cityFilter.val().trim(),
             state: stateFilter.val().trim(),
 
-            // Các trường số không cần trim
             total_hosting_events_min: hostingMin.val() || null,
             total_hosting_events_max: hostingMax.val() || null,
             total_registered_events_min: registeredMin.val() || null,
             total_registered_events_max: registeredMax.val() || null
         };
 
-        // Loại bỏ các bộ lọc rỗng sau khi trim (nếu một trường chỉ chứa khoảng trắng)
         for (var key in currentFilters) {
             if (currentFilters.hasOwnProperty(key)) {
-                // Kiểm tra nếu giá trị là chuỗi và rỗng (sau khi trim) thì xóa bỏ
-                // hoặc nếu giá trị là null (từ các trường số)
                 if ((typeof currentFilters[key] === 'string' && currentFilters[key] === '') || currentFilters[key] === null) {
                     delete currentFilters[key];
                 }
             }
         }
 
-        currentPage = 1; // Reset to first page on new filter
+        currentPage = 1;
         fetchUsers();
     }
 
-    // --- Hàm Clear Filters ---
     function clearFilters() {
         companyFilter.val('');
         jobTitleFilter.val('');
@@ -140,14 +126,13 @@ $(document).ready(function() {
         hostingMax.val('');
         registeredMin.val('');
         registeredMax.val('');
-        sortBy.val('username'); // Reset sort to default
-        currentFilters = {}; // Đảm bảo clear hết filter
+        sortBy.val('username');
+        currentFilters = {};
         currentSort = 'username';
         currentPage = 1;
         fetchUsers();
     }
 
-    // --- Event Listeners cho bộ lọc và phân trang ---
     applyFiltersBtn.on('click', applyFilters);
     clearFiltersBtn.on('click', clearFilters);
     sortBy.on('change', function() {
@@ -170,57 +155,50 @@ $(document).ready(function() {
         fetchUsers();
     });
 
-    // --- Logic cho Modal Email (NEW) ---
 
-    // Mở modal khi click nút
     openEmailModalBtn.on("click", function() {
         emailModal.css("display", "block");
-        emailStatusMessageModal.text(''); // Xóa trạng thái tin nhắn cũ
+        emailStatusMessageModal.text('');
         emailStatusMessageModal.removeClass('success error');
     });
 
-    // Đóng modal khi click nút đóng (x)
     closeButton.on("click", function() {
         emailModal.css("display", "none");
     });
 
-    // Đóng modal khi click ra bên ngoài modal content
     $(window).on("click", function(event) {
-        if (event.target == emailModal[0]) { // Sử dụng [0] để lấy phần tử DOM gốc từ đối tượng jQuery
+        if (event.target == emailModal[0]) {
             emailModal.css("display", "none");
         }
     });
 
-    // Xử lý gửi email từ modal
     sendEmailBtnModal.on("click", function() {
         var subject = emailSubjectModal.val();
         var body = emailBodyModal.val();
-        var htmlBody = emailHtmlBodyModal.val();
-        var csrfToken = $('input[name="csrfmiddlewaretoken"]').val(); // Lấy CSRF token
+        var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
 
         if (!subject || (!body && !htmlBody)) {
             emailStatusMessageModal.text("Subject and at least one body field are required.").addClass('error').removeClass('success');
             return;
         }
 
-        // Tạo đối tượng chứa các tham số lọc hiện tại
-        var filterParams = $.extend({}, currentFilters); // Sao chép currentFilters
-        filterParams.ordering = currentSort; // Thêm ordering
-        filterParams.search = currentSearch; // Thêm search nếu có
+        var filterParams = $.extend({}, currentFilters);
+        filterParams.ordering = currentSort;
+        filterParams.search = currentSearch;
 
         $.ajax({
-            url: '/api/crm/send-emails/', // API endpoint để gửi email
+            url: '/api/crm/send-emails/',
             method: 'POST',
             dataType: 'json',
-            contentType: 'application/json', // Đảm bảo server biết đây là JSON
+            contentType: 'application/json',
             headers: {
-                'X-CSRFToken': csrfToken // Gửi CSRF token trong header
+                'X-CSRFToken': csrfToken
             },
-            data: JSON.stringify({ // Chuyển dữ liệu sang JSON string
+            data: JSON.stringify({
                 subject: subject,
                 body: body,
                 html_body: htmlBody,
-                filters: filterParams // Gửi các filter hiện tại
+                filters: filterParams
             }),
             beforeSend: function() {
                 sendEmailBtnModal.prop('disabled', true).text('Sending...');
@@ -230,12 +208,8 @@ $(document).ready(function() {
                 emailStatusMessageModal.text(data.message);
                 if (data.status === 'success') {
                     emailStatusMessageModal.removeClass('error').addClass('success');
-                    // Xóa nội dung form sau khi gửi thành công
                     emailSubjectModal.val('');
                     emailBodyModal.val('');
-                    emailHtmlBodyModal.val('');
-                    // Tùy chọn: Đóng modal sau khi gửi
-                    // emailModal.css("display", "none");
                 } else {
                     emailStatusMessageModal.removeClass('success').addClass('error');
                 }
@@ -260,6 +234,5 @@ $(document).ready(function() {
         });
     });
 
-    // --- Initial Load ---
     fetchUsers();
 });

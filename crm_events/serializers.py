@@ -69,7 +69,6 @@ class EmailSendSerializer(serializers.Serializer):
     # Email content
     subject = serializers.CharField(max_length=255, help_text="Subject of the email.")
     body = serializers.CharField(help_text="Body content of the email.")
-    html_body = serializers.CharField(required=False, help_text="HTML body content of the email.")
 
     def validate(self, data):
         if not data.get('body') and not data.get('html_body'):
