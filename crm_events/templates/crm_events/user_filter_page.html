@@ -1,10 +1,10 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Filter & List</title>
-    {% load static %}
     <link rel="stylesheet" href="{% static 'crm_events/style.css' %}">
 </head>
 <body>
@@ -52,9 +52,36 @@
             <button id="clearFilters">Clear Filters</button>
         </div>
 
+        {# Nút để mở popup email #}
+        <button id="openEmailModalBtn" class="open-modal-btn">Send Email to Filtered Users</button>
+
+        {# Modal Container cho form gửi email #}
+        <div id="emailModal" class="modal">
+            <div class="modal-content">
+                <span class="close-button">&times;</span>
+                <h2>Send Email to Filtered Users</h2>
+                <p>Emails will be sent to all users matching the current filters above.</p>
+                <div class="form-group">
+                    <label for="emailSubjectModal">Subject:</label>
+                    <input type="text" id="emailSubjectModal" placeholder="Email Subject" required>
+                </div>
+                <div class="form-group">
+                    <label for="emailBodyModal">Body (Plain Text):</label>
+                    <textarea id="emailBodyModal" rows="8" placeholder="Enter plain text email content here..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="emailHtmlBodyModal">Body (HTML - Optional):</label>
+                    <textarea id="emailHtmlBodyModal" rows="8" placeholder="Enter HTML email content here... (overrides plain text if provided)"></textarea>
+                </div>
+                <button id="sendEmailBtnModal" class="send-email-btn">Send Email</button>
+                <p id="emailStatusMessageModal" style="margin-top: 10px;"></p>
+            </div>
+        </div>
+        {# END Modal Container #}
+
         <div class="user-list-section">
             <h2>Users</h2>
-            <div class="table-responsive"> {# Thêm div này để responsive table #}
+            <div class="table-responsive">
                 <table id="userTable" class="user-table">
                     <thead>
                         <tr>
@@ -69,7 +96,8 @@
                         </tr>
                     </thead>
                     <tbody id="userListBody">
-                        </tbody>
+                        {# Dữ liệu người dùng sẽ được load bằng JavaScript #}
+                    </tbody>
                 </table>
             </div>
             <p id="loadingMessage">Loading users...</p>
@@ -90,7 +118,11 @@
         </div>
     </div>
 
+    {# Đảm bảo bạn có jQuery #}
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="{% static 'crm_events/script.js' %}"></script>
+
+    {# CSRF Token cho AJAX POST requests #}
+    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 </body>
 </html>

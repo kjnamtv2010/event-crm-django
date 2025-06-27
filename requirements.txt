@@ -1,9 +1,15 @@
 asgiref==3.7.2
-Django==3.2.20
+Django==4.2.11
 pytz==2025.2
 sqlparse==0.4.4
 typing-extensions==4.7.1
 psycopg2-binary==2.9.9
-Pillow==9.2.0 # handle image
+Pillow==9.2.0
 djangorestframework>=3.14.0
 Faker==25.4.0
+gunicorn==22.0.0
+whitenoise==6.7.0
+python-decouple==3.8
+python-dotenv
+django-extensions
+python-dotenv==1.0.0

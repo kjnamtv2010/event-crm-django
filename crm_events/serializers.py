@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from crm_events.models import CustomUser
 
+
 class CustomUserSerializer(serializers.ModelSerializer):
     """
     Serializer for CustomUser model.
@@ -49,3 +50,28 @@ class CustomUserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class EmailSendSerializer(serializers.Serializer):
+    """
+    Serializer for the email sending endpoint.
+    Includes filter criteria for users and email content.
+    """
+    company = serializers.CharField(required=False, max_length=100)
+    job_title = serializers.CharField(required=False, max_length=100)
+    city = serializers.CharField(required=False, max_length=100)
+    state = serializers.CharField(required=False, max_length=100)
+    total_hosting_events_min = serializers.IntegerField(required=False, min_value=0)
+    total_hosting_events_max = serializers.IntegerField(required=False, min_value=0)
+    total_registered_events_min = serializers.IntegerField(required=False, min_value=0)
+    total_registered_events_max = serializers.IntegerField(required=False, min_value=0)
+
+    # Email content
+    subject = serializers.CharField(max_length=255, help_text="Subject of the email.")
+    body = serializers.CharField(help_text="Body content of the email.")
+    html_body = serializers.CharField(required=False, help_text="HTML body content of the email.")
+
+    def validate(self, data):
+        if not data.get('body') and not data.get('html_body'):
+            raise serializers.ValidationError("Either 'body' or 'html_body' must be provided.")
+        return data
