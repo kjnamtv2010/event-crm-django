@@ -31,6 +31,20 @@ $(document).ready(function() {
     var emailBodyModal = $("#emailBodyModal");
     var emailStatusMessageModal = $("#emailStatusMessageModal");
 
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 
     function fetchUsers() {
         loadingMessage.show();
@@ -52,7 +66,6 @@ $(document).ready(function() {
         if (currentFilters.total_registered_events_min) params.total_registered_events_min = currentFilters.total_registered_events_min;
         if (currentFilters.total_registered_events_max) params.total_registered_events_max = currentFilters.total_registered_events_max;
         if (currentSearch) params.search = currentSearch;
-
 
         $.ajax({
             url: '/api/crm/users/',
@@ -79,7 +92,6 @@ $(document).ready(function() {
                     });
                 }
 
-                // Cập nhật Pagination
                 prevPageBtn.prop('disabled', !response.previous);
                 nextPageBtn.prop('disabled', !response.next);
                 pageInfo.text(`Page ${currentPage} of ${Math.ceil(response.count / pageSizeSelect.val())}`);
@@ -155,7 +167,6 @@ $(document).ready(function() {
         fetchUsers();
     });
 
-
     openEmailModalBtn.on("click", function() {
         emailModal.css("display", "block");
         emailStatusMessageModal.text('');
@@ -173,18 +184,31 @@ $(document).ready(function() {
     });
 
     sendEmailBtnModal.on("click", function() {
-        var subject = emailSubjectModal.val();
-        var body = emailBodyModal.val();
-        var csrfToken = $('input[name="csrfmiddlewaretoken"]').val();
+        var subject = emailSubjectModal.val().trim();
+        var body = emailBodyModal.val().trim();
 
-        if (!subject || (!body && !htmlBody)) {
-            emailStatusMessageModal.text("Subject and at least one body field are required.").addClass('error').removeClass('success');
+        var csrfToken = getCookie('csrftoken');
+
+        if (!subject) {
+            emailStatusMessageModal.text("Subject is required.").addClass('error').removeClass('success');
+            return;
+        }
+        if (!body) {
+            emailStatusMessageModal.text("Email body must be provided.").addClass('error').removeClass('success');
             return;
         }
 
-        var filterParams = $.extend({}, currentFilters);
-        filterParams.ordering = currentSort;
-        filterParams.search = currentSearch;
+        var payloadData = $.extend({}, currentFilters);
+
+        if (currentSort) {
+            payloadData.ordering = currentSort;
+        }
+        if (currentSearch) {
+            payloadData.search = currentSearch;
+        }
+
+        payloadData.subject = subject;
+        payloadData.body = body;
 
         $.ajax({
             url: '/api/crm/send-emails/',
@@ -194,12 +218,7 @@ $(document).ready(function() {
             headers: {
                 'X-CSRFToken': csrfToken
             },
-            data: JSON.stringify({
-                subject: subject,
-                body: body,
-                html_body: htmlBody,
-                filters: filterParams
-            }),
+            data: JSON.stringify(payloadData),
             beforeSend: function() {
                 sendEmailBtnModal.prop('disabled', true).text('Sending...');
                 emailStatusMessageModal.text('Sending emails, please wait...').removeClass('error success');
@@ -223,6 +242,8 @@ $(document).ready(function() {
                         errorMessage = errorData.detail;
                     } else if (errorData.message) {
                         errorMessage = errorData.message;
+                    } else if (errorData.error) {
+                        errorMessage = errorData.error;
                     }
                 } catch (e) {
                     console.error("Failed to parse error response:", e);

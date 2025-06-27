@@ -6,9 +6,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
-from crm_events.models import CustomUser
+
+from crm_events import models
+from crm_events.models import CustomUser, EmailLog
 from crm_events.serializers import CustomUserSerializer, EmailSendSerializer
-from crm_events.services import apply_user_filters
+from crm_events.services import apply_user_filters, get_filter_applies
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +93,16 @@ class SendEmailsView(APIView):
 
         subject = validated_data['subject']
         body = validated_data['body']
-
+        sender_user = request.user if request.user.is_authenticated else None
+        email_log = EmailLog(
+            subject=subject,
+            body=body,
+            filters_applied=get_filter_applies(validated_data),
+            recipients=recipient_list,
+            sent_by=sender_user,
+            num_recipients=len(recipient_list),
+            status='FAILED'
+        )
         try:
             num_sent = send_mail(
                 subject,
@@ -100,6 +111,14 @@ class SendEmailsView(APIView):
                 recipient_list,
                 fail_silently=False,
             )
+            email_log.num_sent_successfully = num_sent
+            if num_sent == len(recipient_list):
+                email_log.status = 'SUCCESS'
+            elif num_sent > 0:
+                email_log.status = 'PARTIAL_SUCCESS'
+            else:
+                email_log.status = 'FAILED'
+            email_log.save()
             logger.info(f"Successfully initiated sending emails to {len(recipient_list)} recipients. {num_sent} sent.")
             return Response({
                 "message": f"Emails sent successfully to {num_sent} recipients.",
@@ -110,3 +129,32 @@ class SendEmailsView(APIView):
             logger.exception(f"Failed to send emails. Error: {e}") # Use logger.exception for traceback
             return Response({"error": f"Failed to send emails: {str(e)}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class EmailAnalyticsView(APIView):
+    def get(self, request, *args, **kwargs):
+        total_emails_sent = EmailLog.objects.count()
+        total_success = EmailLog.objects.filter(status='SUCCESS').count()
+        total_failed = EmailLog.objects.filter(status='FAILED').count()
+        total_partial = EmailLog.objects.filter(status='PARTIAL_SUCCESS').count()
+
+        total_recipients_reached = EmailLog.objects.aggregate(
+            sum_recipients=models.Sum('num_sent_successfully')
+        )['sum_recipients'] or 0
+
+        emails_by_date = EmailLog.objects.annotate(
+            date=models.functions.TruncDate('sent_at')
+        ).values('date').annotate(
+            count=models.Count('id')
+        ).order_by('date')
+
+        return Response({
+            "total_emails_logged": total_emails_sent,
+            "success_rate": {
+                "success": total_success,
+                "failed": total_failed,
+                "partial_success": total_partial,
+                "total_recipients_reached": total_recipients_reached
+            },
+            "emails_by_date": list(emails_by_date)
+        }, status=status.HTTP_200_OK)

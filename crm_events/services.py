@@ -1,5 +1,23 @@
 from django.db.models import Count
 
+def get_filter_applies(validated_data):
+    filters_applied = {}
+    email_content_fields = ['subject', 'body']
+
+    for field, value in validated_data.items():
+        if field in email_content_fields:
+            continue
+
+        if value is not None:
+            if isinstance(value, str):
+                trimmed_value = value.strip()
+                if trimmed_value:
+                    filters_applied[field] = trimmed_value
+            else:
+                filters_applied[field] = value
+    return filters_applied
+
+
 def apply_user_filters(queryset, filters):
     """
     Helper function to apply common filters to the CustomUser queryset.

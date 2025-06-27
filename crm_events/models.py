@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-
+from django.utils import timezone
 
 class CustomUser(AbstractUser):
     """
@@ -97,3 +97,25 @@ class EventRegistration(models.Model):
     class Meta:
         unique_together = ('user', 'event')
         db_table = 'event_registrations'
+
+
+class EmailLog(models.Model):
+    subject = models.CharField(max_length=255)
+    body = models.TextField(blank=True, null=True)
+    filters_applied = models.JSONField(blank=True, null=True)
+    recipients = models.JSONField()
+
+    sent_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_emails')
+    sent_at = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=[
+        ('SUCCESS', 'Success'),
+        ('FAILED', 'Failed'),
+        ('PARTIAL_SUCCESS', 'Partial Success')
+    ])
+    error_message = models.TextField(blank=True, null=True)
+    num_recipients = models.IntegerField(default=0)
+    num_sent_successfully = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-sent_at']
+        db_table = 'email_log'
