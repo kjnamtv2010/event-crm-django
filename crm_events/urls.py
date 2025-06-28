@@ -1,9 +1,7 @@
-from django.contrib import admin
 from django.urls import path
 from crm_events import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('users/', views.CustomUserFilterView.as_view(), name='user-filter-api'),
     path('users-ui/', views.UserFilterPageView.as_view(), name='user-filter-ui'),
     path('events/', views.EventListView.as_view(), name='event-list-api'),

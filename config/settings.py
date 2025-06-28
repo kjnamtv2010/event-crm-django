@@ -30,9 +30,6 @@ DEBUG = True
 ALLOWED_HOSTS = ['3.107.102.130', 'localhost', '127.0.0.1']
 
 AUTH_USER_MODEL = 'crm_events.CustomUser'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-]
 
 
 # Application definition
@@ -139,6 +136,9 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'crm_events/static'),
+]
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
