@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Sending Status</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f4f7f6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.2em;
+        }
+        h2 {
+            color: #0056b3;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.6em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+
+        .filter-form {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: flex-end;
+        }
+        .filter-form div {
+            flex: 1;
+            min-width: 200px;
+        }
+        .filter-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.95em;
+            color: #555;
+        }
+        .filter-form input[type="text"],
+        .filter-form select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        .filter-form button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.2s ease;
+            white-space: nowrap;
+        }
+        .filter-form button:hover {
+            background-color: #0056b3;
+        }
+        .filter-form button:active {
+            transform: translateY(1px);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        th, td {
+            border: 1px solid #e9ecef;
+            padding: 12px 15px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.9em;
+        }
+        th {
+            background-color: #e2e6ea;
+            color: #495057;
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+        th:hover {
+            background-color: #d1d8df;
+        }
+        th .sort-indicator {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7em;
+            color: #6c757d;
+        }
+        th.sorted-asc .sort-indicator:after {
+            content: ' ▲';
+        }
+        th.sorted-desc .sort-indicator:after {
+            content: ' ▼';
+        }
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        tr:hover {
+            background-color: #eef2f5;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+        }
+        .status-badge.SUCCESS { background-color: #28a745; }
+        .status-badge.FAILED { background-color: #dc3545; }
+        .status-badge.PARTIAL_SUCCESS { background-color: #ffc107; color: #343a40; }
+
+        .pagination {
+            margin-top: 25px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+        .pagination a, .pagination span {
+            display: inline-block;
+            padding: 8px 14px;
+            border: 1px solid #ced4da;
+            text-decoration: none;
+            color: #007bff;
+            border-radius: 4px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .pagination a:hover {
+            background-color: #e9ecef;
+            border-color: #007bff;
+        }
+        .pagination .current-page {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+            font-weight: bold;
+            cursor: default;
+        }
+        .pagination .disabled {
+            color: #adb5bd;
+            pointer-events: none;
+            background-color: #f1f3f5;
+        }
+        .pagination-info {
+            margin-top: 15px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        #loading-message, #error-message, #no-records-message {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.1em;
+            color: #555;
+            display: none;
+        }
+        #error-message {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        /* Top Menu Button */
+        .top-menu {
+            margin-bottom: 20px;
+        }
+        .return-button {
+            display: inline-block;
+            padding: 10px 15px;
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .return-button:hover {
+            background-color: #5a6268;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="top-menu">
+            <a href="{% url 'user-filter-ui' %}" class="return-button">Return to User List</a>
+        </div>
+        <h1>Email Sending Status</h1>
+
+        <h2>Filters</h2>
+        <div class="filter-form">
+            <div>
+                <label for="status-filter">Status:</label>
+                <select id="status-filter">
+                    <option value="">All</option>
+                    <option value="SUCCESS">Success</option>
+                    <option value="FAILED">Failed</option>
+                    <option value="PARTIAL_SUCCESS">Partial Success</option>
+                </select>
+            </div>
+            <div>
+                <label for="event-title-filter">Event:</label>
+                <input type="text" id="event-title-filter" placeholder="Event title (e.g., ABC Conference)">
+            </div>
+            <button id="apply-filters">Apply</button>
+            <button id="clear-filters">Clear Filters</button>
+        </div>
+
+        <h2>Email Logs</h2>
+        <div id="loading-message">Loading email logs...</div>
+        <div id="error-message"></div>
+        <div id="no-records-message">No email records found matching your criteria.</div>
+
+        <table id="email-logs-table">
+            <thead>
+                <tr>
+                    <th data-sort-field="sent_at" class="sortable">Sent At <span class="sort-indicator"></span></th>
+                    <th data-sort-field="subject" class="sortable">Subject <span class="sort-indicator"></span></th>
+                    <th data-sort-field="recipients" class="sortable">Recipients <span class="sort-indicator"></span></th>
+                    <th data-sort-field="status" class="sortable">Status <span class="sort-indicator"></span></th>
+                    <th data-sort-field="num_sent_successfully" class="sortable">Sent Successfully <span class="sort-indicator"></span></th>
+                    <th data-sort-field="num_recipients" class="sortable">Total Recipients <span class="sort-indicator"></span></th>
+                    <th data-sort-field="sent_by__email" class="sortable">Sent By <span class="sort-indicator"></span></th>
+                    <th data-sort-field="event__title" class="sortable">Event <span class="sort-indicator"></span></th>
+                    <th>Error Message</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+
+        <div class="pagination">
+        </div>
+        <div class="pagination-info">
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "{% url 'email-log-api' %}";
+
+        let currentFilters = {};
+        let currentSortField = '-sent_at';
+        let currentPage = 1;
+
+        function fetchEmailLogs(page = 1, filters = {}, sortField = '-sent_at') {
+            $('#loading-message').show();
+            $('#error-message').hide().text('');
+            $('#no-records-message').hide();
+            $('#email-logs-table tbody').empty();
+            $('.pagination').empty();
+            $('.pagination-info').empty();
+
+            currentPage = page;
+            currentFilters = { ...filters };
+            currentSortField = sortField;
+
+            const params = new URLSearchParams({
+                page: page,
+                ordering: sortField,
+            });
+
+            if (filters.status) params.append('status', filters.status);
+            if (filters.event_title) params.append('event__title__icontains', filters.event_title);
+
+            $.ajax({
+                url: `${API_URL}?${params.toString()}`,
+                method: 'GET',
+                success: function(response) {
+                    $('#loading-message').hide();
+
+                    const logs = response.results;
+                    const totalRecords = response.count;
+                    const pageSize = response.page_size || 10;
+                    const totalPages = Math.ceil(totalRecords / pageSize);
+
+                    if (logs.length === 0) {
+                        $('#no-records-message').show();
+                        return;
+                    }
+
+                    let tableHtml = '';
+                    logs.forEach(log => {
+                        const recipientsList = Array.isArray(log.recipients) ? log.recipients.join(', ') : (log.recipients || 'N/A');
+                        const statusClass = log.status.replace(/_/g, '');
+                        const errorMessage = log.error_message || '';
+
+                        const sentBy = log.sent_by ? `${log.sent_by.username} (${log.sent_by.email})` : 'N/A';
+                        const eventTitle = log.event ? log.event.title : 'N/A';
+
+                        tableHtml += `
+                            <tr>
+                                <td>${new Date(log.sent_at).toLocaleString()}</td>
+                                <td>${log.subject}</td>
+                                <td><span title="${recipientsList}">${recipientsList.substring(0, 50)}${recipientsList.length > 50 ? '...' : ''}</span></td>
+                                <td><span class="status-badge ${statusClass}">${log.status}</span></td>
+                                <td>${log.num_sent_successfully}</td>
+                                <td>${log.num_recipients}</td>
+                                <td>${sentBy}</td>
+                                <td>${eventTitle}</td>
+                                <td><span title="${errorMessage}">${errorMessage.substring(0, 70)}${errorMessage.length > 70 ? '...' : ''}</span></td>
+                            </tr>
+                        `;
+                    });
+                    $('#email-logs-table tbody').html(tableHtml);
+
+                    updatePaginationControls(currentPage, totalPages, totalRecords, pageSize);
+                    updateSortIndicators();
+                },
+                error: function(xhr, status, error) {
+                    $('#loading-message').hide();
+                    let errorMessage = "Error loading data. Please try again.";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    $('#error-message').text(errorMessage).show();
+                    console.error("Error fetching email logs:", error, xhr.responseText);
+                }
+            });
+        }
+
+        function updatePaginationControls(currentPage, totalPages, totalRecords, pageSize) {
+            const paginationContainer = $('.pagination');
+            paginationContainer.empty();
+
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+            if (endPage - startPage + 1 < maxPagesToShow) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+
+            if (currentPage > 1) {
+                paginationContainer.append(`<a href="#" data-page="${currentPage - 1}">Previous</a>`);
+            } else {
+                paginationContainer.append(`<span class="disabled">Previous</span>`);
+            }
+
+            if (startPage > 1) {
+                paginationContainer.append(`<a href="#" data-page="1">1</a>`);
+                if (startPage > 2) {
+                    paginationContainer.append(`<span class="disabled">...</span>`);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const activeClass = (i === currentPage) ? 'current-page' : '';
+                paginationContainer.append(`<a href="#" class="${activeClass}" data-page="${i}">${i}</a>`);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationContainer.append(`<span class="disabled">...</span>`);
+                }
+                paginationContainer.append(`<a href="#" data-page="${totalPages}">${totalPages}</a>`);
+            }
+
+            if (currentPage < totalPages) {
+                paginationContainer.append(`<a href="#" data-page="${currentPage + 1}">Next</a>`);
+            } else {
+                paginationContainer.append(`<span class="disabled">Next</span>`);
+            }
+
+            const startRecord = (currentPage - 1) * pageSize + 1;
+            const endRecord = Math.min(currentPage * pageSize, totalRecords);
+            $('.pagination-info').text(`Showing ${startRecord}-${endRecord} of ${totalRecords} records`);
+        }
+
+        function updateSortIndicators() {
+            $('#email-logs-table th.sortable').removeClass('sorted-asc sorted-desc');
+            const sortDirection = currentSortField.startsWith('-') ? 'desc' : 'asc';
+            const sortField = sortDirection === 'desc' ? currentSortField.substring(1) : currentSortField;
+
+            const cleanSortField = sortField.split('__')[0];
+
+            $(`th[data-sort-field="${cleanSortField}"]`).addClass(`sorted-${sortDirection}`);
+        }
+
+        $(document).ready(function() {
+            fetchEmailLogs(1, currentFilters, currentSortField);
+
+            $('#apply-filters').on('click', function() {
+                const filters = {
+                    status: $('#status-filter').val(),
+                    event_title: $('#event-title-filter').val().trim(),
+                };
+                fetchEmailLogs(1, filters, currentSortField);
+            });
+
+            $('#clear-filters').on('click', function() {
+                $('#status-filter').val('');
+                $('#event-title-filter').val('');
+                fetchEmailLogs(1, {}, '-sent_at');
+            });
+
+            $(document).on('click', '.pagination a', function(e) {
+                e.preventDefault();
+                const page = $(this).data('page');
+                if (page) {
+                    fetchEmailLogs(page, currentFilters, currentSortField);
+                }
+            });
+
+            $(document).on('click', '#email-logs-table th.sortable', function() {
+                const field = $(this).data('sort-field');
+                let newSortField = field;
+
+                if (currentSortField.endsWith(field)) {
+                    newSortField = currentSortField.startsWith('-') ? field : `-${field}`;
+                } else {
+                    newSortField = `-${field}`;
+                }
+                fetchEmailLogs(currentPage, currentFilters, newSortField);
+            });
+        });
+    </script>
+</body>
+</html>

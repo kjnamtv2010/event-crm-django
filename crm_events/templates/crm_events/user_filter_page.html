@@ -6,10 +6,127 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Filter & List</title>
     <link rel="stylesheet" href="{% static 'crm_events/style.css' %}">
+    <style>
+        /* Top Navigation Menu */
+        .top-menu {
+            margin-bottom: 20px;
+            background-color: #f0f0f0;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: flex-start;
+            gap: 15px;
+            align-items: center;
+        }
+        .top-menu a {
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 3px;
+            transition: background-color 0.3s ease;
+        }
+        .top-menu a:hover {
+            background-color: #e0e0e0;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            padding-top: 60px;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+        }
+
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input[type="text"],
+        .form-group textarea,
+        .form-group select {
+            width: calc(100% - 20px);
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .send-email-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .send-email-btn:hover {
+            background-color: #0056b3;
+        }
+        /* Style for success/error messages */
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <h1>User Directory</h1>
+
+        <div class="top-menu">
+            <span>Navigation:</span>
+            <a href="{% url 'user-filter-ui' %}">User List</a>
+            <a href="/admin/crm_events/event/add/">Create New Event</a>
+            <a href="/admin/crm_events/event/">Manage Events</a>
+            <a href="{% url 'email_status_tracker' %}">Email Tracker</a>
+            <a href="/admin/">Admin Dashboard</a>
+            <a href="{% url 'utm-analysis-api' %}">UTM Data List (UI)</a>
+        </div>
 
         <div class="filters-card">
             <h2>Filter Users</h2>
@@ -52,10 +169,8 @@
             <button id="clearFilters">Clear Filters</button>
         </div>
 
-        {# Nút để mở popup email #}
         <button id="openEmailModalBtn" class="open-modal-btn">Send Email to Filtered Users</button>
 
-        {# Modal Container cho form gửi email #}
         <div id="emailModal" class="modal">
             <div class="modal-content">
                 <span class="close-button">&times;</span>
@@ -67,13 +182,18 @@
                 </div>
                 <div class="form-group">
                     <label for="emailBodyModal">Body (Plain Text):</label>
-                    <textarea id="emailBodyModal" rows="8" placeholder="Enter plain text email content here..."></textarea>
+                    <textarea id="emailBodyModal" rows="8" placeholder="Enter plain text email content here..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="eventSelectModal">Link to Event (Optional):</label>
+                    <select id="eventSelectModal">
+                        <option value="">-- Select an Event (Optional) --</option>
+                    </select>
                 </div>
                 <button id="sendEmailBtnModal" class="send-email-btn">Send Email</button>
                 <p id="emailStatusMessageModal" style="margin-top: 10px;"></p>
             </div>
         </div>
-        {# END Modal Container #}
 
         <div class="user-list-section">
             <h2>Users</h2>
@@ -92,7 +212,7 @@
                         </tr>
                     </thead>
                     <tbody id="userListBody">
-                        {# Dữ liệu người dùng sẽ được load bằng JavaScript #}
+                        {# User data will be loaded by JavaScript #}
                     </tbody>
                 </table>
             </div>
@@ -114,11 +234,9 @@
         </div>
     </div>
 
-    {# Đảm bảo bạn có jQuery #}
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="{% static 'crm_events/script.js' %}"></script>
 
-    {# CSRF Token cho AJAX POST requests #}
     <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 </body>
 </html>

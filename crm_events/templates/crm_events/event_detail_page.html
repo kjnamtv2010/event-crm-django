@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ event.title }} - Event Details</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'crm_events/style.css' %}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        /* General Body and Container Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Headings and Text */
+        h1 {
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.5em;
+            font-weight: 600;
+        }
+        h2, h3 {
+            color: #0056b3;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 5px;
+        }
+        p {
+            margin-bottom: 10px;
+            font-size: 1.05em;
+        }
+        p strong {
+            color: #555;
+            font-weight: 600;
+        }
+
+        /* List Styles (Hosts, Attendees) */
+        ul {
+            list-style: none;
+            padding: 0;
+            margin-bottom: 20px;
+        }
+        ul li {
+            background-color: #e9f7fe;
+            border-left: 4px solid #007bff;
+            margin-bottom: 8px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.95em;
+        }
+        ul li:nth-child(even) {
+            background-color: #f0faff; /* Slightly different shade for even rows */
+        }
+        .empty-list-message {
+            color: #777;
+            font-style: italic;
+            padding: 10px 0;
+        }
+
+        /* Management Form Styles */
+        .management-form {
+            background-color: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-top: 40px;
+            text-align: center;
+        }
+        .management-form h2 {
+            font-size: 2em;
+            color: #007bff;
+            border-bottom: none;
+            margin-bottom: 20px;
+            padding-bottom: 0;
+        }
+        .management-form p {
+            margin-bottom: 20px;
+            color: #666;
+            font-size: 1em;
+        }
+        .management-form label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+            text-align: left;
+            width: fit-content;
+            margin: 0 auto 8px auto; /* Center labels above inputs */
+        }
+        .management-form input[type="email"] {
+            width: calc(100% - 40px);
+            max-width: 400px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .management-form input[type="email"]:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);
+            outline: none;
+        }
+
+        /* Checkbox Group */
+        .management-form .checkbox-group {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 30px;
+            margin-top: 20px;
+        }
+        .management-form .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            padding-left: 35px;
+            user-select: none;
+            font-weight: normal;
+            font-size: 1.1em;
+            color: #444;
+        }
+        .management-form .checkbox-wrapper input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+        }
+        .management-form .checkmark {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 24px;
+            width: 24px;
+            background-color: #eee;
+            border-radius: 5px;
+            border: 1px solid #bbb;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .management-form .checkbox-wrapper input:checked ~ .checkmark {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .management-form .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+        }
+        .management-form .checkbox-wrapper input:checked ~ .checkmark:after {
+            display: block;
+        }
+        .management-form .checkmark:after {
+            left: 9px;
+            top: 5px;
+            width: 6px;
+            height: 12px;
+            border: solid white;
+            border-width: 0 3px 3px 0;
+            transform: rotate(45deg);
+        }
+
+        /* Button */
+        .management-form button {
+            background-color: #28a745;
+            color: white;
+            padding: 14px 35px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
+        }
+        .management-form button:hover {
+            background-color: #218838;
+            transform: translateY(-2px);
+        }
+        .management-form button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
+        }
+
+        /* Message Area */
+        #form-message-management {
+            margin-top: 25px;
+            text-align: center;
+            padding: 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1em;
+            display: none;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        #form-message-management.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        #form-message-management.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Login Prompt */
+        .login-prompt {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 1.1em;
+            color: #6c757d;
+        }
+        .login-prompt a {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .login-prompt a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ event.title }}</h1>
+        <p><strong>Description:</strong> {{ event.description|default:"No description available." }}</p>
+        <p><strong>Starts At:</strong> {{ event.start_at|date:"d/m/Y H:i" }}</p>
+        <p><strong>Ends At:</strong> {{ event.end_at|date:"d/m/Y H:i" }}</p>
+        <p><strong>Location:</strong> {{ event.venue|default:"Online" }}</p>
+        {% if event.max_capacity %}
+            <p><strong>Max Capacity:</strong> {{ event.max_capacity }} people</p>
+        {% endif %}
+        <p>
+            <strong>Owner:</strong> {{ event.owner.username }} ({{ event.owner.email }})
+            {% if is_owner %}
+                <span style="color: green; font-weight: bold;">(You are the owner of this event)</span>
+            {% endif %}
+        </p>
+
+        <h3>Hosts:</h3>
+        <ul id="hosts-list">
+            {% for host in event.hosts.all %}
+                <li>{{ host.username }} ({{ host.email }})</li>
+            {% empty %}
+                <li class="empty-list-message">No hosts assigned yet.</li>
+            {% endfor %}
+        </ul>
+
+        <h3>Attendees:</h3>
+        <ul id="attendees-list">
+            {% for attendee in event.attendees.all %}
+                <li>{{ attendee.username }} ({{ attendee.email }})</li>
+            {% empty %}
+                <li class="empty-list-message">No one has registered to attend yet.</li>
+            {% endfor %}
+        </ul>
+
+        <div class="management-form">
+            <h2>Manage User Roles for Event</h2>
+            <p>Enter user's email and select their role (check to add, uncheck to remove):</p>
+            <input type="email" id="user-email-management" placeholder="Enter user's email..." />
+            <div class="checkbox-group">
+                <label class="checkbox-wrapper">
+                    Host
+                    <input type="checkbox" id="checkbox-host-management" name="user_role">
+                    <span class="checkmark"></span>
+                </label>
+                <label class="checkbox-wrapper">
+                    Attend
+                    <input type="checkbox" id="checkbox-attend-management" name="user_role">
+                    <span class="checkmark"></span>
+                </label>
+            </div>
+            <button id="submit-management-action">Submit User Role</button>
+            <p id="form-message-management"></p>
+        </div>
+
+    </div>
+
+    <script>
+        const eventSlug = "{{ event.slug }}";
+
+        /**
+         * Generates a simple UUID v4.
+         * @returns {string} A UUID string.
+         */
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                let r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        /**
+         * Retrieves or generates a session ID from localStorage.
+         * @returns {string} The unique session ID.
+         */
+        function getSessionId() {
+            let sessionId = localStorage.getItem('session_id');
+            if (!sessionId) {
+                sessionId = generateUUID();
+                localStorage.setItem('session_id', sessionId);
+            }
+            return sessionId;
+        }
+
+        /**
+         * Extracts query parameters from the current URL.
+         * @returns {object} An object containing the query parameters.
+         */
+        function getQueryParams() {
+            const params = {};
+            const urlSearchParams = new URLSearchParams(window.location.search);
+            for (const [key, value] of urlSearchParams.entries()) {
+                params[key] = value;
+            }
+            return params;
+        }
+
+        // Get UTM tracking data and session ID when the page loads
+        const urlQueryParams = getQueryParams();
+        const utmTrackingData = {
+            utm_source: urlQueryParams.utm_source || null,
+            utm_medium: urlQueryParams.utm_medium || null,
+            utm_campaign: urlQueryParams.utm_campaign || null,
+            utm_term: urlQueryParams.utm_term || null,
+            utm_content: urlQueryParams.utm_content || null,
+            session_id: getSessionId()
+        };
+
+        /**
+         * Updates the Host and Attendee lists on the UI based on fresh event data.
+         * @param {object} eventData - The event object containing hosts and attendees arrays.
+         */
+        function updateLists(eventData) {
+            let hostsHtml = '';
+            if (eventData.hosts && eventData.hosts.length > 0) {
+                eventData.hosts.forEach(host => {
+                    hostsHtml += `<li>${host.username} (${host.email})</li>`;
+                });
+            } else {
+                hostsHtml = '<li class="empty-list-message">No hosts assigned yet.</li>';
+            }
+            $('#hosts-list').html(hostsHtml);
+
+            let attendeesHtml = '';
+            if (eventData.attendees && eventData.attendees.length > 0) {
+                eventData.attendees.forEach(attendee => {
+                    attendeesHtml += `<li>${attendee.username} (${attendee.email})</li>`;
+                });
+            } else {
+                attendeesHtml = '<li class="empty-list-message">No one has registered to attend yet.</li>';
+            }
+            $('#attendees-list').html(attendeesHtml);
+        }
+
+        $(document).ready(function() {
+            /**
+             * Retrieves a CSRF token from the document cookies.
+             * @param {string} name - The name of the cookie to retrieve (e.g., 'csrftoken').
+             * @returns {string|null} The CSRF token value, or null if not found.
+             */
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            // Handle click event for the "Submit User Role" button
+            $('#submit-management-action').on('click', function() {
+                const email = $('#user-email-management').val();
+                const isHost = $('#checkbox-host-management').is(':checked');
+                const isAttend = $('#checkbox-attend-management').is(':checked');
+
+                // Hide and clear previous messages
+                $('#form-message-management').hide().removeClass('success error').text('');
+
+                // Basic frontend validation
+                if (!email) {
+                    $('#form-message-management').text("Please enter a user email.").addClass('error').show();
+                    return;
+                }
+                if (!isHost && !isAttend) {
+                    $('#form-message-management').text("Please select at least one role (Host or Attend).").addClass('error').show();
+                    return;
+                }
+
+                // Combine form data with UTM tracking data
+                const postData = {
+                    email: email,
+                    is_host: isHost,
+                    is_attend: isAttend,
+                    ...utmTrackingData // Add UTM parameters to the payload
+                };
+
+                // Send AJAX request
+                $.ajax({
+                    url: `/crm/events/register/${eventSlug}/`,
+                    method: 'POST',
+                    contentType: 'application/json',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    data: JSON.stringify(postData),
+                    success: function(response) {
+                        console.log("Management action successful:", response);
+                        $('#form-message-management').text(response.message).addClass('success').show();
+                        updateLists(response.event_data); // Update Hosts and Attendees lists
+                    },
+                    error: function(xhr) {
+                        console.error("Error performing management action:", xhr.responseText);
+                        let errorMessage = "An unknown error occurred.";
+                        if (xhr.responseJSON) {
+                            // Extract detailed error messages from Django REST Framework validation errors
+                            if (xhr.responseJSON.non_field_errors) {
+                                errorMessage = xhr.responseJSON.non_field_errors.join(' ');
+                            } else if (xhr.responseJSON.email) { // Adjusted field name to 'email' as per serializer
+                                errorMessage = "Email error: " + xhr.responseJSON.email.join(' ');
+                            } else if (xhr.responseJSON.is_host) {
+                                errorMessage = "Host error: " + xhr.responseJSON.is_host.join(' ');
+                            } else if (xhr.responseJSON.is_attend) {
+                                errorMessage = "Attendee error: " + xhr.responseJSON.is_attend.join(' ');
+                            } else if (xhr.responseJSON.message) {
+                                errorMessage = xhr.responseJSON.message;
+                            } else {
+                                errorMessage = Object.values(xhr.responseJSON).flat().join(' ');
+                            }
+                        } else if (xhr.responseText) {
+                            try {
+                                const parsedError = JSON.parse(xhr.responseText);
+                                errorMessage = parsedError.error || parsedError.message || xhr.responseText;
+                            } catch (e) {
+                                errorMessage = xhr.responseText;
+                            }
+                        }
+                        $('#form-message-management').text("Error: " + errorMessage).addClass('error').show();
+                    }
+                });
+            });
+
+            // Implement radio-button-like behavior for checkboxes:
+            // If Host is checked, uncheck Attendee
+            $('#checkbox-host-management').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#checkbox-attend-management').prop('checked', false);
+                }
+            });
+
+            // If Attendee is checked, uncheck Host
+            $('#checkbox-attend-management').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#checkbox-host-management').prop('checked', false);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

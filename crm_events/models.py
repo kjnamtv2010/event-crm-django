@@ -16,10 +16,10 @@ class CustomUser(AbstractUser):
         ('O', 'Other'),
     ]
     gender = models.CharField(max_length=1, choices=gender_choices, blank=True, null=True)
-    job_title = models.CharField(max_length=100, blank=True, null=True)
-    company = models.CharField(max_length=100, blank=True, null=True)
-    city = models.CharField(max_length=100, blank=True, null=True)
-    state = models.CharField(max_length=100, blank=True, null=True)
+    job_title = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    company = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    city = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+    state = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     groups = models.ManyToManyField(
         'auth.Group',
@@ -60,43 +60,29 @@ class Event(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='owned_events'
+        related_name='owned_events',
+        help_text="The user who created and manages this event."
     )
 
     hosts = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        related_name='hosting_events',
-        blank=True
+        related_name='hosted_events',  # <--- CHANGE THIS from 'hosting_events'
+        blank=True,
+        help_text="Users officially hosting the event."
+    )
+
+    attendees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name='attended_events',
+        blank=True,
+        help_text="Users who have registered to attend this event."
     )
 
     class Meta:
         db_table = 'events'
 
     def __str__(self):
-        return self.title
-
-
-class EventRegistration(models.Model):
-    """
-    Model representing a user's registration for an event.
-    """
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='event_registrations'
-    )
-    # ForeignKey to Event
-    event = models.ForeignKey(
-        'Event',
-        on_delete=models.CASCADE,
-        related_name='registrations'
-    )
-    registered_at = models.DateTimeField(
-        auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'event')
-        db_table = 'event_registrations'
+        return f"{self.slug} - Title: {self.title}"
 
 
 class EmailLog(models.Model):
@@ -115,7 +101,39 @@ class EmailLog(models.Model):
     error_message = models.TextField(blank=True, null=True)
     num_recipients = models.IntegerField(default=0)
     num_sent_successfully = models.IntegerField(default=0)
+    event = models.ForeignKey(
+        'Event',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='email_logs'
+    )
 
     class Meta:
         ordering = ['-sent_at']
         db_table = 'email_log'
+
+
+class UTMData(models.Model):
+    utm_source = models.CharField(max_length=255, blank=True, null=True)
+    utm_medium = models.CharField(max_length=255, blank=True, null=True)
+    utm_campaign = models.CharField(max_length=255, blank=True, null=True)
+    utm_term = models.CharField(max_length=255, blank=True, null=True)
+    utm_content = models.CharField(max_length=255, blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name='utm_data_records')
+    session_id = models.CharField(max_length=255, blank=True, null=True)
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, null=True, blank=True,
+                              related_name='utm_data_entries')
+
+    ROLE_CHOICES = [
+        ('host', 'Host'),
+        ('attendee', 'Attendee'),
+        ('unregistered', 'Unregistered')  # For when roles are removed
+    ]
+    role_change_type = models.CharField(max_length=20, choices=ROLE_CHOICES, blank=True, null=True)
+
+    class Meta:
+        db_table = 'utm_data'

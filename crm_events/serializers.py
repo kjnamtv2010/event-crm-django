@@ -1,48 +1,41 @@
 from rest_framework import serializers
-from crm_events.models import CustomUser
+from django.contrib.auth import get_user_model
+from .models import Event, CustomUser, EmailLog
 
+User = get_user_model()
 
 class CustomUserSerializer(serializers.ModelSerializer):
     """
-    Serializer for CustomUser model.
-    Includes counts of owned, hosting, and registered events as read-only fields.
+    Serializer for the CustomUser model, including aggregated event counts.
     """
     total_owned_events = serializers.IntegerField(read_only=True)
     total_hosting_events = serializers.IntegerField(read_only=True)
-    total_registered_events = serializers.IntegerField(read_only=True)
+    total_attended_events = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = CustomUser
-        fields = [
+        fields = (
             'id', 'username', 'email', 'first_name', 'last_name',
-            'phone_number', 'gender', 'job_title', 'company', 'city', 'state',
-            'total_owned_events', 'total_hosting_events', 'total_registered_events',
-        ]
-
-    def get_total_owned_events(self, obj):
-        if hasattr(obj, 'total_owned_events'):
-            return obj.total_owned_events
-        return obj.owned_events.count()
-
-    def get_total_hosting_events(self, obj):
-        if hasattr(obj, 'total_hosting_events'):
-            return obj.total_hosting_events
-        return obj.hosting_events.count()
-
-    def get_total_registered_events(self, obj):
-        if hasattr(obj, 'total_registered_events'):
-            return obj.total_registered_events
-        return obj.event_registrations.count()
+            'company', 'job_title', 'city', 'state',
+            'date_joined',
+            'total_owned_events', 'total_hosting_events', 'total_attended_events'
+        )
 
     def create(self, validated_data):
+        """
+        Creates a new CustomUser instance, handling password hashing.
+        """
         password = validated_data.pop('password', None)
-        user = CustomUser.objects.create(**validated_data)
+        user = User.objects.create(**validated_data)
         if password is not None:
             user.set_password(password)
             user.save()
         return user
 
     def update(self, instance, validated_data):
+        """
+        Updates an existing CustomUser instance, handling password hashing.
+        """
         password = validated_data.pop('password', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -54,8 +47,7 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 class EmailSendSerializer(serializers.Serializer):
     """
-    Serializer for the email sending endpoint.
-    Includes filter criteria for users and email content.
+    Serializer for sending emails to users based on various filters.
     """
     company = serializers.CharField(required=False, max_length=100)
     job_title = serializers.CharField(required=False, max_length=100)
@@ -63,14 +55,118 @@ class EmailSendSerializer(serializers.Serializer):
     state = serializers.CharField(required=False, max_length=100)
     total_hosting_events_min = serializers.IntegerField(required=False, min_value=0)
     total_hosting_events_max = serializers.IntegerField(required=False, min_value=0)
-    total_registered_events_min = serializers.IntegerField(required=False, min_value=0)
-    total_registered_events_max = serializers.IntegerField(required=False, min_value=0)
 
-    # Email content
+    total_attended_events_min = serializers.IntegerField(required=False, min_value=0)
+    total_attended_events_max = serializers.IntegerField(required=False, min_value=0)
+
     subject = serializers.CharField(max_length=255, help_text="Subject of the email.")
-    body = serializers.CharField(help_text="Body content of the email.")
+    body = serializers.CharField(help_text="Body content of the email (plain text).")
+
+    event_slug = serializers.CharField(
+        required=False, max_length=200, help_text="Slug of the event to link this email to."
+    )
 
     def validate(self, data):
-        if not data.get('body') and not data.get('html_body'):
-            raise serializers.ValidationError("Either 'body' or 'html_body' must be provided.")
+        """
+        Validates email content, event slug existence, and min/max ranges for event counts.
+        """
+        if not data.get('body'):
+            raise serializers.ValidationError(
+                {"body": "Email body plain text must be provided."})
+
+        event_slug = data.get('event_slug')
+        if event_slug and not Event.objects.filter(slug=event_slug).exists():
+            raise serializers.ValidationError(
+                {"event_slug": "Event with this slug does not exist."})
+
+        if 'total_hosting_events_min' in data and 'total_hosting_events_max' in data and \
+                data['total_hosting_events_min'] > data['total_hosting_events_max']:
+            raise serializers.ValidationError(
+                {"total_hosting_events_max": "Min cannot be greater than max for hosting events."})
+
+        if 'total_attended_events_min' in data and 'total_attended_events_max' in data and \
+                data['total_attended_events_min'] > data['total_attended_events_max']:
+            raise serializers.ValidationError({
+                                                "total_attended_events_max": "Min cannot be greater than max for attended events."})
+
         return data
+
+
+class EventSerializer(serializers.ModelSerializer):
+    """
+    Basic serializer for the Event model, exposing slug and title.
+    """
+    class Meta:
+        model = Event
+        fields = ('slug', 'title')
+
+
+class EventDetailAndRegisterSerializer(serializers.ModelSerializer):
+    """
+    Serializer for detailed event information, including related user data (owner, hosts, attendees).
+    """
+    owner = CustomUserSerializer(read_only=True)
+    hosts = CustomUserSerializer(many=True, read_only=True)
+    attendees = CustomUserSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Event
+        fields = [
+            'slug', 'title', 'description', 'start_at', 'end_at', 'venue',
+            'max_capacity', 'owner', 'hosts', 'attendees'
+        ]
+        lookup_field = 'slug'
+
+
+class EventManageUserActionSerializer(serializers.Serializer):
+    """
+    Serializer for managing a user's role (host/attendee) for an event,
+    including capturing UTM parameters.
+    """
+    email = serializers.EmailField(help_text="Email of the user to perform action on.")
+    is_host = serializers.BooleanField(default=False, help_text="Set user as Host.")
+    is_attend = serializers.BooleanField(default=False, help_text="Set user as Attendee.")
+
+    utm_source = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    utm_medium = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    utm_campaign = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    utm_term = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    utm_content = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+    session_id = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
+
+    user_to_manage = None
+
+    def validate(self, data):
+        """
+        Validates the user's email, checks for role conflicts (host/attendee),
+        and ensures at least one action is specified.
+        """
+        user_email_input = data.get('email')
+        if not user_email_input:
+            raise serializers.ValidationError({"email": "User email is required."})
+
+        try:
+            self.user_to_manage = User.objects.get(email__iexact=user_email_input)
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User with this email not found."})
+
+        if data.get('is_host') and data.get('is_attend'):
+            raise serializers.ValidationError(
+                "A user cannot be both a Host and an Attendee simultaneously.")
+
+        if not data.get('is_host') and not data.get('is_attend'):
+            raise serializers.ValidationError(
+                "At least one role (Host or Attendee) must be selected.")
+
+        return data
+
+
+class SimpleUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email']
+
+class SimpleEventSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['title']

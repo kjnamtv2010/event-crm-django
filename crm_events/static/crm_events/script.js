@@ -18,18 +18,18 @@ $(document).ready(function() {
     var pageInfo = $('#pageInfo');
     var pageSizeSelect = $('#pageSizeSelect');
 
-    var currentPage = 1;
-    var currentFilters = {};
-    var currentSort = sortBy.val();
-    var currentSearch = '';
-
     var emailModal = $("#emailModal");
     var openEmailModalBtn = $("#openEmailModalBtn");
     var closeButton = $(".close-button");
     var sendEmailBtnModal = $("#sendEmailBtnModal");
     var emailSubjectModal = $("#emailSubjectModal");
     var emailBodyModal = $("#emailBodyModal");
+    var eventSelectModal = $("#eventSelectModal");
     var emailStatusMessageModal = $("#emailStatusMessageModal");
+
+    var currentPage = 1;
+    var currentFilters = {};
+    var currentSort = sortBy.val();
 
     function getCookie(name) {
         let cookieValue = null;
@@ -45,6 +45,7 @@ $(document).ready(function() {
         }
         return cookieValue;
     }
+    const csrftoken = getCookie('csrftoken');
 
     function fetchUsers() {
         loadingMessage.show();
@@ -57,15 +58,11 @@ $(document).ready(function() {
             ordering: currentSort
         };
 
-        if (currentFilters.company) params.company = currentFilters.company;
-        if (currentFilters.job_title) params.job_title = currentFilters.job_title;
-        if (currentFilters.city) params.city = currentFilters.city;
-        if (currentFilters.state) params.state = currentFilters.state;
-        if (currentFilters.total_hosting_events_min) params.total_hosting_events_min = currentFilters.total_hosting_events_min;
-        if (currentFilters.total_hosting_events_max) params.total_hosting_events_max = currentFilters.total_hosting_events_max;
-        if (currentFilters.total_registered_events_min) params.total_registered_events_min = currentFilters.total_registered_events_min;
-        if (currentFilters.total_registered_events_max) params.total_registered_events_max = currentFilters.total_registered_events_max;
-        if (currentSearch) params.search = currentSearch;
+        for (const key in currentFilters) {
+            if (currentFilters[key] !== null && currentFilters[key] !== '') {
+                params[key] = currentFilters[key];
+            }
+        }
 
         $.ajax({
             url: '/api/crm/users/',
@@ -77,15 +74,16 @@ $(document).ready(function() {
                 if (response.results.length === 0) {
                     noUsersMessage.show();
                 } else {
+                    noUsersMessage.hide();
                     response.results.forEach(function(user) {
                         var row = `<tr>
                             <td>${user.username}</td>
-                            <td>${user.email}</td>
+                            <td>${user.email || 'N/A'}</td>
                             <td>${user.company || 'N/A'}</td>
                             <td>${user.job_title || 'N/A'}</td>
-                            <td>${user.city || 'N/A'}, ${user.state || 'N/A'}</td>
+                            <td>${(user.city || '') + (user.city && user.state ? ', ' : '') + (user.state || 'N/A')}</td>
                             <td>${user.total_hosting_events}</td>
-                            <td>${user.total_registered_events}</td>
+                            <td>${user.total_attended_events}</td>
                             <td>${new Date(user.date_joined).toLocaleDateString()}</td>
                         </tr>`;
                         userListBody.append(row);
@@ -94,12 +92,13 @@ $(document).ready(function() {
 
                 prevPageBtn.prop('disabled', !response.previous);
                 nextPageBtn.prop('disabled', !response.next);
-                pageInfo.text(`Page ${currentPage} of ${Math.ceil(response.count / pageSizeSelect.val())}`);
+                const totalPages = Math.ceil(response.count / pageSizeSelect.val()) || 1;
+                pageInfo.text(`Page ${currentPage} of ${totalPages}`);
             },
             error: function(xhr, status, error) {
                 loadingMessage.hide();
                 noUsersMessage.text("Error loading users: " + error).show();
-                console.error("Error fetching users:", status, error);
+                console.error("Error fetching users:", status, error, xhr.responseText);
             }
         });
     }
@@ -110,20 +109,11 @@ $(document).ready(function() {
             job_title: jobTitleFilter.val().trim(),
             city: cityFilter.val().trim(),
             state: stateFilter.val().trim(),
-
             total_hosting_events_min: hostingMin.val() || null,
             total_hosting_events_max: hostingMax.val() || null,
             total_registered_events_min: registeredMin.val() || null,
             total_registered_events_max: registeredMax.val() || null
         };
-
-        for (var key in currentFilters) {
-            if (currentFilters.hasOwnProperty(key)) {
-                if ((typeof currentFilters[key] === 'string' && currentFilters[key] === '') || currentFilters[key] === null) {
-                    delete currentFilters[key];
-                }
-            }
-        }
 
         currentPage = 1;
         fetchUsers();
@@ -167,27 +157,46 @@ $(document).ready(function() {
         fetchUsers();
     });
 
+    function loadEventsIntoDropdown() {
+        $.ajax({
+            url: '/crm/events/',
+            method: 'GET',
+            success: function(data) {
+                eventSelectModal.empty();
+                eventSelectModal.append('<option value="">-- Select an Event (Optional) --</option>');
+                data.forEach(event => {
+                    eventSelectModal.append(`<option value="${event.slug}">${event.title}</option>`);
+                });
+            },
+            error: function(xhr, status, error) {
+                console.error("Error loading events for dropdown:", error, xhr.responseText);
+                eventSelectModal.empty().append('<option value="">Error loading events</option>');
+            }
+        });
+    }
+
     openEmailModalBtn.on("click", function() {
         emailModal.css("display", "block");
-        emailStatusMessageModal.text('');
-        emailStatusMessageModal.removeClass('success error');
+        emailStatusMessageModal.text('').removeClass('success error');
+        loadEventsIntoDropdown();
     });
 
     closeButton.on("click", function() {
         emailModal.css("display", "none");
+        emailStatusMessageModal.text('');
     });
 
     $(window).on("click", function(event) {
         if (event.target == emailModal[0]) {
             emailModal.css("display", "none");
+            emailStatusMessageModal.text('');
         }
     });
 
     sendEmailBtnModal.on("click", function() {
         var subject = emailSubjectModal.val().trim();
         var body = emailBodyModal.val().trim();
-
-        var csrfToken = getCookie('csrftoken');
+        var eventSlug = eventSelectModal.val();
 
         if (!subject) {
             emailStatusMessageModal.text("Subject is required.").addClass('error').removeClass('success');
@@ -198,17 +207,20 @@ $(document).ready(function() {
             return;
         }
 
-        var payloadData = $.extend({}, currentFilters);
+        var payloadData = {
+            subject: subject,
+            body: body,
+        };
 
-        if (currentSort) {
-            payloadData.ordering = currentSort;
-        }
-        if (currentSearch) {
-            payloadData.search = currentSearch;
+        if (eventSlug) {
+            payloadData.event_slug = eventSlug;
         }
 
-        payloadData.subject = subject;
-        payloadData.body = body;
+        for (const key in currentFilters) {
+            if (currentFilters[key] !== null && currentFilters[key] !== '') {
+                payloadData[key] = currentFilters[key];
+            }
+        }
 
         $.ajax({
             url: '/api/crm/send-emails/',
@@ -216,7 +228,7 @@ $(document).ready(function() {
             dataType: 'json',
             contentType: 'application/json',
             headers: {
-                'X-CSRFToken': csrfToken
+                'X-CSRFToken': csrftoken
             },
             data: JSON.stringify(payloadData),
             beforeSend: function() {
@@ -224,33 +236,43 @@ $(document).ready(function() {
                 emailStatusMessageModal.text('Sending emails, please wait...').removeClass('error success');
             },
             success: function(data) {
-                emailStatusMessageModal.text(data.message);
-                if (data.status === 'success') {
-                    emailStatusMessageModal.removeClass('error').addClass('success');
-                    emailSubjectModal.val('');
-                    emailBodyModal.val('');
-                } else {
-                    emailStatusMessageModal.removeClass('success').addClass('error');
-                }
+                emailStatusMessageModal.text(data.message).removeClass('error').addClass('success');
+                emailSubjectModal.val('');
+                emailBodyModal.val('');
+                eventSelectModal.val('');
                 sendEmailBtnModal.prop('disabled', false).text('Send Email');
             },
-            error: function(xhr, textStatus, errorThrown) {
+            error: function(xhr) {
                 var errorMessage = "An unexpected error occurred.";
                 try {
-                    var errorData = JSON.parse(xhr.responseText);
-                    if (errorData.detail) {
-                        errorMessage = errorData.detail;
-                    } else if (errorData.message) {
-                        errorMessage = errorData.message;
-                    } else if (errorData.error) {
-                        errorMessage = errorData.error;
+                    var errorData = xhr.responseJSON;
+                    if (errorData) {
+                        if (errorData.message) {
+                            errorMessage = errorData.message;
+                        } else if (errorData.detail) {
+                            errorMessage = errorData.detail;
+                        } else if (errorData.non_field_errors) {
+                            errorMessage = errorData.non_field_errors.join(', ');
+                        } else {
+                            let fieldErrors = [];
+                            for (const key in errorData) {
+                                if (Array.isArray(errorData[key])) {
+                                    fieldErrors.push(`${key}: ${errorData[key].join(', ')}`);
+                                } else {
+                                    fieldErrors.push(`${key}: ${errorData[key]}`);
+                                }
+                            }
+                            if (fieldErrors.length > 0) {
+                                errorMessage = fieldErrors.join('; ');
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error("Failed to parse error response:", e);
                 }
                 emailStatusMessageModal.text("Error: " + errorMessage).removeClass('success').addClass('error');
                 sendEmailBtnModal.prop('disabled', false).text('Send Email');
-                console.error("AJAX Error:", textStatus, errorThrown, xhr.responseText);
+                console.error("AJAX Error:", xhr.status, xhr.statusText, xhr.responseText);
             }
         });
     });

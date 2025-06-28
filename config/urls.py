@@ -22,4 +22,5 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/api/crm/users-ui/', permanent=False),
          name='root_redirect_to_user_filter_ui'),
     path('api/crm/', include('crm_events.urls')),
+    path('crm/', include('crm_events.urls')),
 ]
