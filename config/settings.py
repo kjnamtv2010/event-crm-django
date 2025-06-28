@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-tj4@fpa!$kay0%qhki%&ujno85ahqrzm5sz)n3hq&ilburzb1^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['3.107.102.130', 'localhost', '127.0.0.1']
 
 AUTH_USER_MODEL = 'crm_events.CustomUser'
 STATICFILES_DIRS = [
