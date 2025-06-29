@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Event, CustomUser, EmailLog
+from .models import Event, CustomUser
 
 User = get_user_model()
 
@@ -104,10 +104,11 @@ class EventSerializer(serializers.ModelSerializer):
 class EventDetailAndRegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for detailed event information, including related user data (owner, hosts, attendees).
+    Now using a single 'participants' M2M relationship with a 'through' model.
     """
     owner = CustomUserSerializer(read_only=True)
-    hosts = CustomUserSerializer(many=True, read_only=True)
-    attendees = CustomUserSerializer(many=True, read_only=True)
+    hosts = serializers.SerializerMethodField()
+    attendees = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -116,6 +117,14 @@ class EventDetailAndRegisterSerializer(serializers.ModelSerializer):
             'max_capacity', 'owner', 'hosts', 'attendees'
         ]
         lookup_field = 'slug'
+
+    def get_hosts(self, obj):
+        hosts_queryset = obj.get_hosts()
+        return CustomUserSerializer(hosts_queryset, many=True).data
+
+    def get_attendees(self, obj):
+        attendees_queryset = obj.get_attendees()
+        return CustomUserSerializer(attendees_queryset, many=True).data
 
 
 class EventManageUserActionSerializer(serializers.Serializer):
@@ -137,10 +146,6 @@ class EventManageUserActionSerializer(serializers.Serializer):
     user_to_manage = None
 
     def validate(self, data):
-        """
-        Validates the user's email, checks for role conflicts (host/attendee),
-        and ensures at least one action is specified.
-        """
         user_email_input = data.get('email')
         if not user_email_input:
             raise serializers.ValidationError({"email": "User email is required."})
@@ -153,10 +158,6 @@ class EventManageUserActionSerializer(serializers.Serializer):
         if data.get('is_host') and data.get('is_attend'):
             raise serializers.ValidationError(
                 "A user cannot be both a Host and an Attendee simultaneously.")
-
-        if not data.get('is_host') and not data.get('is_attend'):
-            raise serializers.ValidationError(
-                "At least one role (Host or Attendee) must be selected.")
 
         return data
 

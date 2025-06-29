@@ -1,7 +1,7 @@
 import logging
 from django.db import transaction
 from django.db.models import Count, Q
-from .models import CustomUser, Event, UTMData
+from .models import CustomUser, Event, EventParticipation, UTMData
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +31,12 @@ def get_filter_applies(validated_data):
 def apply_user_filters(queryset, filters):
     """
     Applies filters to a CustomUser queryset based on provided filter parameters.
-    Includes filtering by company, job title, city, state, and event counts.
+    Includes filtering by various user attributes and event counts (owned, hosted, attended).
     """
     queryset = queryset.annotate(
         total_owned_events=Count('owned_events', distinct=True),
-        total_hosting_events=Count('hosted_events', distinct=True),
-        total_attended_events=Count('attended_events', distinct=True)
+        total_hosting_events=Count('eventparticipation__event', filter=Q(eventparticipation__role='host'), distinct=True),
+        total_attended_events=Count('eventparticipation__event', filter=Q(eventparticipation__role='attendee'), distinct=True)
     )
 
     if filters.get('company'):
@@ -173,21 +173,15 @@ def filter_and_sort_utm_records(queryset, request_get_params):
     return queryset, sort_by
 
 
-def manage_event_user_role(event: Event, user: CustomUser, desired_is_host: bool,
-                           desired_is_attend: bool) -> dict:
-    """
-    Manages a user's role (host or attendee) for a given event.
-    Handles adding/removing users from roles and enforces capacity limits.
-    Returns a dictionary with success status, messages, HTTP status code,
-    whether a change was performed, the type of change, and the user's current status.
-    """
+def manage_event_user_role(event, user, desired_is_host, desired_is_attend):
     messages = []
-    status_code = 200  # Mặc định là OK
+    status_code = 200
     actual_role_change_performed = False
     final_role_change_type = None
 
-    current_is_hosting = event.hosts.filter(pk=user.pk).exists()
-    current_is_attending = event.attendees.filter(pk=user.pk).exists()
+    current_participation = EventParticipation.objects.filter(user=user, event=event).first()
+    current_is_hosting = current_participation and current_participation.role == 'host'
+    current_is_attending = current_participation and current_participation.role == 'attendee'
 
     if desired_is_host and desired_is_attend:
         messages.append(
@@ -204,70 +198,47 @@ def manage_event_user_role(event: Event, user: CustomUser, desired_is_host: bool
             }
         }
 
-    # Đảm bảo tất cả các thao tác thay đổi vai trò diễn ra trong một transaction nguyên tử
     with transaction.atomic():
-        # Xử lý vai trò Host
+        if current_participation:
+            current_participation.delete()
+            actual_role_change_performed = True
+            messages.append(f"'{user.email}' has been removed from their previous role.")
+
         if desired_is_host:
-            if not current_is_hosting:
-                event.hosts.add(user)
+            if not EventParticipation.objects.filter(user=user, event=event, role='host').exists():
+                EventParticipation.objects.create(user=user, event=event, role='host')
                 messages.append(f"'{user.email}' has been added as a Host.")
                 actual_role_change_performed = True
                 final_role_change_type = 'host'
             else:
-                messages.append(f"'{user.email}' is already a Host.")
+                messages.append(f"'{user.email}' is already a Host (no change needed).")
+                actual_role_change_performed = False # Không thay đổi nếu đã tồn tại
 
-            # Nếu người dùng đang là Attendee, hãy loại bỏ họ khỏi Attendee
-            if current_is_attending:
-                event.attendees.remove(user)
-                messages.append(
-                    f"'{user.email}' has been removed from Attendees (as they are now a Host).")
+        elif desired_is_attend:
+            current_attendee_count = EventParticipation.objects.filter(event=event, role='attendee').count()
+            if event.max_capacity and current_attendee_count >= event.max_capacity:
+                messages.append(f"Event is full, cannot add '{user.email}' as an Attendee.")
+                status_code = 400
+                actual_role_change_performed = False
+            elif not EventParticipation.objects.filter(user=user, event=event, role='attendee').exists():
+                EventParticipation.objects.create(user=user, event=event, role='attendee')
+                messages.append(f"'{user.email}' has been added as an Attendee.")
                 actual_role_change_performed = True
-        elif not desired_is_host and current_is_hosting:
-            # Nếu không muốn là host nữa nhưng hiện tại đang là host, thì loại bỏ
-            event.hosts.remove(user)
-            messages.append(f"'{user.email}' has been removed from Hosts.")
-            actual_role_change_performed = True
-            final_role_change_type = 'unregistered'  # Hoặc 'unhost' rõ ràng hơn
+                final_role_change_type = 'attendee'
+            else:
+                messages.append(f"'{user.email}' is already an Attendee (no change needed).")
+                actual_role_change_performed = False # Không thay đổi nếu đã tồn tại
+        else:
+            if actual_role_change_performed and not final_role_change_type:
+                final_role_change_type = 'unregistered'
+                messages.append("User's role has been removed.")
+            elif not actual_role_change_performed and not messages:
+                messages.append("No changes were made to user's roles.")
 
-        # Kiểm tra lại trạng thái host sau khi xử lý host, để quyết định xử lý attendee
-        user_is_host_after_host_processing = event.hosts.filter(pk=user.pk).exists()
 
-        # Xử lý vai trò Attendee (chỉ khi người dùng không phải là Host)
-        if not user_is_host_after_host_processing:
-            if desired_is_attend:
-                if not current_is_attending:
-                    # Kiểm tra sức chứa trước khi thêm attendee
-                    if event.max_capacity and event.attendees.count() >= event.max_capacity:
-                        messages.append(f"Event is full, cannot add '{user.email}' as an Attendee.")
-                        status_code = 400  # Đặt trạng thái lỗi do sức chứa
-                        actual_role_change_performed = False  # Không có thay đổi nào được thực hiện
-                    else:
-                        event.attendees.add(user)
-                        messages.append(f"'{user.email}' has been added as an Attendee.")
-                        actual_role_change_performed = True
-                        final_role_change_type = 'attendee'
-                else:
-                    messages.append(f"'{user.email}' is already an Attendee.")
-            elif not desired_is_attend and current_is_attending:
-                # Nếu không muốn là attendee nữa nhưng hiện tại đang là attendee, thì loại bỏ
-                event.attendees.remove(user)
-                messages.append(f"'{user.email}' has been removed from Attendees.")
-                actual_role_change_performed = True
-                if final_role_change_type is None:  # Chỉ đặt nếu chưa được đặt từ logic host
-                    final_role_change_type = 'unregistered'  # Hoặc 'unattend' rõ ràng hơn
-
-        # Lưu sự kiện sau khi tất cả các thay đổi trong transaction đã được thực hiện
-        event.save()
-
-    # Nếu không có thay đổi nào được thực hiện và không có tin nhắn nào được thêm
-    if not actual_role_change_performed and not messages:
-        messages.append("No changes were made to user's roles.")
-
-    # Cập nhật trạng thái cuối cùng của người dùng sau khi thay đổi
-    current_status = {
-        'is_hosting': event.hosts.filter(pk=user.pk).exists(),
-        'is_attending': event.attendees.filter(pk=user.pk).exists()
-    }
+    current_status_after_change = EventParticipation.objects.filter(user=user, event=event).first()
+    final_is_hosting = current_status_after_change and current_status_after_change.role == 'host'
+    final_is_attending = current_status_after_change and current_status_after_change.role == 'attendee'
 
     return {
         'success': status_code == 200 and actual_role_change_performed,
@@ -275,12 +246,15 @@ def manage_event_user_role(event: Event, user: CustomUser, desired_is_host: bool
         'status_code': status_code,
         'actual_role_change_performed': actual_role_change_performed,
         'final_role_change_type': final_role_change_type,
-        'current_status': current_status
+        'current_status': {
+            'is_hosting': final_is_hosting,
+            'is_attending': final_is_attending
+        }
     }
 
 
 def record_utm_data_for_event_role_change(user: CustomUser, event: Event, role_change_type: str,
-                                          utm_data_fields: dict) -> dict:
+                                         utm_data_fields: dict) -> dict:
     """
     Records UTM data for a user's role change related to an event.
     Returns a dictionary with success status and a message.

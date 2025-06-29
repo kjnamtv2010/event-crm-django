@@ -33,7 +33,6 @@ from .services import (
 logger = logging.getLogger(__name__)
 
 
-# --- UI Views ---
 class UserFilterPageView(TemplateView):
     """
     Renders the user filter page.
@@ -64,11 +63,10 @@ class EventDetailPageView(DetailView):
 
         if user.is_authenticated:
             context['is_owner'] = user == event.owner
-            context['viewer_is_hosting'] = event.hosts.filter(pk=user.pk).exists()
+            context['viewer_is_hosting'] = event.get_hosts().filter(pk=user.pk).exists()
         return context
 
 
-# --- API Views ---
 class CustomUserFilterView(APIView):
     """
     API endpoint for filtering and paginating CustomUser instances.
@@ -190,13 +188,13 @@ class SendEmailsView(APIView):
                     'utm_source': "crm_email",
                     'utm_medium': "email",
                     'utm_campaign': f"event_{event_slug.replace('-', '_')}",
-                    'utm_content': "text_link"
+                    'utm_content': "textlink"
                 }
                 event_link = f"{base_url}?{urlencode(utm_params)}"
 
                 plain_body_content = plain_body_content.replace('{event_link}', event_link) \
-                                                       if '{event_link}' in plain_body_content else \
-                                                       f"{plain_body_content}\n\nFind more details here: {event_link}"
+                                                     if '{event_link}' in plain_body_content else \
+                                                     f"{plain_body_content}\n\nFind more details here: {event_link}"
 
             except Event.DoesNotExist:
                 logger.error(f"Event with slug '{event_slug}' not found for email, despite serializer validation.")
@@ -281,7 +279,6 @@ class EventDetailAndRegisterView(APIView):
         desired_is_host = serializer.validated_data.get('is_host', False)
         desired_is_attend = serializer.validated_data.get('is_attend', False)
 
-        # Trích xuất dữ liệu UTM từ request
         utm_data_fields_from_request = {
             'utm_source': serializer.validated_data.get('utm_source'),
             'utm_medium': serializer.validated_data.get('utm_medium'),
@@ -294,7 +291,6 @@ class EventDetailAndRegisterView(APIView):
                                     v is not None and v != ''}
         has_utm_params = bool(utm_data_fields_to_save)
 
-        # Gọi service để quản lý vai trò người dùng trong sự kiện
         role_management_result = manage_event_user_role(
             event=event,
             user=user_to_manage,
@@ -308,7 +304,6 @@ class EventDetailAndRegisterView(APIView):
         final_role_change_type = role_management_result['final_role_change_type']
         user_status_updated = role_management_result['current_status']
 
-        # Nếu có thay đổi vai trò và có tham số UTM, ghi lại dữ liệu UTM
         if actual_role_change_performed and final_role_change_type and has_utm_params:
             utm_record_result = record_utm_data_for_event_role_change(
                 user=user_to_manage,
@@ -320,8 +315,6 @@ class EventDetailAndRegisterView(APIView):
         elif actual_role_change_performed and not has_utm_params:
             messages.append("Role changed, but no UTM data provided to record.")
 
-        # Refresh lại event object để đảm bảo lấy được trạng thái mới nhất (ví dụ: số lượng attendees/hosts)
-        # sau khi service đã thay đổi và lưu vào DB.
         event.refresh_from_db()
         updated_event_data = EventDetailAndRegisterSerializer(event).data
 

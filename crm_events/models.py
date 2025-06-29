@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.utils import timezone
 
+
 class CustomUser(AbstractUser):
     """
     Custom User model extending Django's AbstractUser to add
@@ -26,7 +27,7 @@ class CustomUser(AbstractUser):
         verbose_name='groups',
         blank=True,
         help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.',
-        related_name="customuser_set",  # Unique related_name for custom user
+        related_name="customuser_set",
         related_query_name="customuser",
     )
     user_permissions = models.ManyToManyField(
@@ -34,7 +35,7 @@ class CustomUser(AbstractUser):
         verbose_name='user permissions',
         blank=True,
         help_text='Specific permissions for this user.',
-        related_name="customuser_set",  # Unique related_name for custom user
+        related_name="customuser_set",
         related_query_name="customuser",
     )
 
@@ -64,18 +65,12 @@ class Event(models.Model):
         help_text="The user who created and manages this event."
     )
 
-    hosts = models.ManyToManyField(
+    participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        related_name='hosted_events',  # <--- CHANGE THIS from 'hosting_events'
+        through='EventParticipation',
+        related_name='participated_events',
         blank=True,
-        help_text="Users officially hosting the event."
-    )
-
-    attendees = models.ManyToManyField(
-        settings.AUTH_USER_MODEL,
-        related_name='attended_events',
-        blank=True,
-        help_text="Users who have registered to attend this event."
+        help_text="Users participating in the event as either hosts or attendees."
     )
 
     class Meta:
@@ -84,6 +79,36 @@ class Event(models.Model):
     def __str__(self):
         return f"{self.slug} - Title: {self.title}"
 
+    def get_hosts(self):
+        return self.participants.filter(eventparticipation__role='host')
+
+    def get_attendees(self):
+        return self.participants.filter(eventparticipation__role='attendee')
+
+
+class EventParticipation(models.Model):
+    """
+    Intermediate model to manage user participation in events,
+    including their role (host/attendee).
+    """
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+
+    ROLE_CHOICES = [
+        ('host', 'Host'),
+        ('attendee', 'Attendee'),
+    ]
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
+
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'event')
+        db_table = 'event_participation'
+
+    def __str__(self):
+        return f"{self.user.username} as {self.role} in {self.event.title}"
+
 
 class EmailLog(models.Model):
     subject = models.CharField(max_length=255)
@@ -91,7 +116,8 @@ class EmailLog(models.Model):
     filters_applied = models.JSONField(blank=True, null=True)
     recipients = models.JSONField()
 
-    sent_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='sent_emails')
+    sent_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='sent_emails')
     sent_at = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=20, choices=[
         ('SUCCESS', 'Success'),
