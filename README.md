@@ -56,7 +56,7 @@ event-crm-django/
 | **Database**  | PostgreSQL (AWS RDS for production)              |
 | **Server**    | Gunicorn, Nginx                                  |
 | **Deployment**| AWS EC2 (Ubuntu 22.04 LTS), systemd              |
-| **Source Code**| [GitHub Repository](https://github.com/your-repo) |
+| **Source Code**| [GitHub Repository](https://github.com/kjnamtv2010/event-crm-django) |
 
 ## 4. Local Development Setup
 
@@ -95,7 +95,7 @@ pip install -r requirements.txt
 ```bash
 psql -U postgres
 ```
-Option 2: One-liner commands
+then
 ```sql
 sudo -u postgres psql -c "CREATE DATABASE eventcrmdb;"
 sudo -u postgres psql -c "CREATE USER postgres WITH PASSWORD 'postgres';"
