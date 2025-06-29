@@ -190,7 +190,7 @@ class SendEmailsView(APIView):
                     'utm_source': "crm_email",
                     'utm_medium': "email",
                     'utm_campaign': f"event_{event_slug.replace('-', '_')}",
-                    'utm_content': "email_cta"
+                    'utm_content': "text_link"
                 }
                 event_link = f"{base_url}?{urlencode(utm_params)}"
 
