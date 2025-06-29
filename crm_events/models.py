@@ -87,6 +87,8 @@ class Event(models.Model):
 
 
 class EventParticipation(models.Model):
+    ROLE_HOST = 'host'
+    ROLE_ATTENDEE = 'attendee'
     """
     Intermediate model to manage user participation in events,
     including their role (host/attendee).
