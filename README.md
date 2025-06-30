@@ -160,6 +160,8 @@ Admin: http://127.0.0.1:8000/admin/
 
 ## 5. Deployment to AWS
 
+Link: http://54.153.241.10/api/crm/users-ui/
+
 ### 5.1 Production Stack
 
 | Component        | Description                                  |
