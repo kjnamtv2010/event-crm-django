@@ -28,7 +28,6 @@ def build_event_email_with_encrypted_link(event_obj, request_obj, user_email, us
         'utm_campaign': f"event_{event_slug.replace('-', '_')}",
         'utm_content': "textlink"
     }
-
     event_expiry_datetime = event_obj.end_at
     if event_expiry_datetime.tzinfo is None:
         event_expiry_datetime = TIMEZONE.localize(event_expiry_datetime)
@@ -48,6 +47,7 @@ def send_bulk_event_emails(subject, body_template, users, event_slug=None, sende
     if event_slug:
         try:
             event_obj = Event.objects.get(slug=event_slug)
+            event_obj.refresh_from_db()
         except Event.DoesNotExist:
             raise ValueError("Event not found.")
 

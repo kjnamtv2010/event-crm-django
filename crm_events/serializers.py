@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Event, CustomUser
-from .token_utils import decrypt_event_token
+from crm_events.token_utils import decrypt_event_token
 
 User = get_user_model()
 
