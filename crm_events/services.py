@@ -35,8 +35,16 @@ def apply_user_filters(queryset, filters):
     """
     queryset = queryset.annotate(
         total_owned_events=Count('owned_events', distinct=True),
-        total_hosting_events=Count('eventparticipation__event', filter=Q(eventparticipation__role='host'), distinct=True),
-        total_attended_events=Count('eventparticipation__event', filter=Q(eventparticipation__role='attendee'), distinct=True)
+        total_hosting_events=Count(
+            'eventparticipations__event',
+            filter=Q(eventparticipations__role='host'),
+            distinct=True
+        ),
+        total_attended_events=Count(
+            'eventparticipations__event',
+            filter=Q(eventparticipations__role='attendee'),
+            distinct=True
+        )
     )
 
     if filters.get('company'):

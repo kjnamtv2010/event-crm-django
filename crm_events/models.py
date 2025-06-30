@@ -80,10 +80,16 @@ class Event(models.Model):
         return f"{self.slug} - Title: {self.title}"
 
     def get_hosts(self):
-        return self.participants.filter(eventparticipation__role='host')
+        return CustomUser.objects.filter(
+            eventparticipations__event=self,
+            eventparticipations__role='host'
+        )
 
     def get_attendees(self):
-        return self.participants.filter(eventparticipation__role='attendee')
+        return CustomUser.objects.filter(
+            eventparticipations__event=self,
+            eventparticipations__role='attendee'
+        )
 
 
 class EventParticipation(models.Model):
@@ -93,8 +99,12 @@ class EventParticipation(models.Model):
     Intermediate model to manage user participation in events,
     including their role (host/attendee).
     """
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    event = models.ForeignKey(Event, on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name='eventparticipations'
+    )
+    event = models.ForeignKey(
+        Event, on_delete=models.CASCADE, related_name='eventparticipations'
+    )
 
     ROLE_CHOICES = [
         ('host', 'Host'),

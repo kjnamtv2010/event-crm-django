@@ -261,10 +261,9 @@
                 <span style="color: green; font-weight: bold;">(You are the owner of this event)</span>
             {% endif %}
         </p>
-
         <h3>Hosts:</h3>
         <ul id="hosts-list">
-            {% for host in event.hosts.all %}
+            {% for host in hosts %}
                 <li>{{ host.username }} ({{ host.email }})</li>
             {% empty %}
                 <li class="empty-list-message">No hosts assigned yet.</li>
@@ -273,7 +272,7 @@
 
         <h3>Attendees:</h3>
         <ul id="attendees-list">
-            {% for attendee in event.attendees.all %}
+            {% for attendee in attendees %}
                 <li>{{ attendee.username }} ({{ attendee.email }})</li>
             {% empty %}
                 <li class="empty-list-message">No one has registered to attend yet.</li>

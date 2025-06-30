@@ -50,16 +50,16 @@ class EventDetailPageView(DetailView):
     slug_field = 'slug'
     slug_url_kwarg = 'slug'
 
-    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
-        """
-        Adds additional context data for event ownership and hosting status.
-        """
+    def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         event = self.get_object()
         user = self.request.user
 
         context['is_owner'] = False
         context['viewer_is_hosting'] = False
+
+        context['hosts'] = event.get_hosts()
+        context['attendees'] = event.get_attendees()
 
         if user.is_authenticated:
             context['is_owner'] = user == event.owner
@@ -253,13 +253,11 @@ class SendEmailsView(APIView):
 
 class EventDetailAndRegisterView(APIView):
     """
-    API endpoint for retrieving event details and managing user registration/hosting for an event.
+    API endpoint for retrieving detailed event information and for managing
+    a user's role (host/attendee) within an event.
     """
 
     def get(self, request: Any, slug: str, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handles GET requests to retrieve details for a specific event.
-        """
         event = get_object_or_404(Event, slug=slug)
         serializer = EventDetailAndRegisterSerializer(event)
         return Response(serializer.data)
@@ -275,25 +273,31 @@ class EventDetailAndRegisterView(APIView):
         serializer = EventManageUserActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_to_manage = serializer.user_to_manage
+        user = serializer.user_to_manage
         desired_is_host = serializer.validated_data.get('is_host', False)
         desired_is_attend = serializer.validated_data.get('is_attend', False)
 
-        utm_data_fields_from_request = {
-            'utm_source': serializer.validated_data.get('utm_source'),
-            'utm_medium': serializer.validated_data.get('utm_medium'),
-            'utm_campaign': serializer.validated_data.get('utm_campaign'),
-            'utm_term': serializer.validated_data.get('utm_term'),
-            'utm_content': serializer.validated_data.get('utm_content'),
-            'session_id': serializer.validated_data.get('session_id'),
+        current_participation = event.eventparticipations.filter(user=user).first()
+        is_already_participating = bool(current_participation)
+
+        if event.max_capacity is not None and event.max_capacity > 0:
+            if not is_already_participating and (desired_is_host or desired_is_attend):
+                current_total_participants = event.eventparticipations.count()
+                if current_total_participants >= event.max_capacity:
+                    return Response(
+                        {"message": "Event has reached its maximum capacity. Cannot add new participants."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+        utm_data_fields = {
+            k: v for k, v in serializer.validated_data.items()
+            if k.startswith('utm_') or k == 'session_id' and v is not None and v != ''
         }
-        utm_data_fields_to_save = {k: v for k, v in utm_data_fields_from_request.items() if
-                                    v is not None and v != ''}
-        has_utm_params = bool(utm_data_fields_to_save)
+        has_utm_params = bool(utm_data_fields)
 
         role_management_result = manage_event_user_role(
             event=event,
-            user=user_to_manage,
+            user=user,
             desired_is_host=desired_is_host,
             desired_is_attend=desired_is_attend
         )
@@ -306,14 +310,17 @@ class EventDetailAndRegisterView(APIView):
 
         if actual_role_change_performed and final_role_change_type and has_utm_params:
             utm_record_result = record_utm_data_for_event_role_change(
-                user=user_to_manage,
+                user=user,
                 event=event,
                 role_change_type=final_role_change_type,
-                utm_data_fields=utm_data_fields_to_save
+                utm_data_fields=utm_data_fields
             )
             messages.append(utm_record_result['message'])
         elif actual_role_change_performed and not has_utm_params:
             messages.append("Role changed, but no UTM data provided to record.")
+        elif not actual_role_change_performed and not messages:
+            messages.append("No actual role change was performed.")
+
 
         event.refresh_from_db()
         updated_event_data = EventDetailAndRegisterSerializer(event).data

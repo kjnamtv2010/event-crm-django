@@ -13,7 +13,7 @@ class EventParticipationInline(admin.TabularInline):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('title', 'start_at', 'end_at', 'owner', 'max_capacity', 'display_hosts_count',
+    list_display = ('title', 'slug', 'start_at', 'end_at', 'owner', 'max_capacity', 'display_hosts_count',
                     'display_attendees_count')
     list_filter = ('start_at', 'end_at', 'owner')
     search_fields = ('title', 'description', 'venue', 'owner__username', 'owner__email')
@@ -29,7 +29,6 @@ class EventAdmin(admin.ModelAdmin):
     display_hosts_count.admin_order_field = 'eventparticipation__role'
 
     def display_attendees_count(self, obj):
-        # Sử dụng phương thức get_attendees từ model Event
         return obj.get_attendees().count()
 
     display_attendees_count.short_description = 'Attendees Count'
@@ -52,3 +51,25 @@ class CustomUserAdmin(UserAdmin):
         (None,
          {'fields': ('phone_number', 'avatar', 'gender', 'job_title', 'company', 'city', 'state')}),
     )
+
+
+@admin.register(EventParticipation)
+class EventParticipationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'user_email', 'event', 'role', 'joined_at')
+    list_filter = ('role', 'joined_at')
+    search_fields = ('user__username', 'user__email', 'event__title')
+    readonly_fields = ('user', 'event', 'role', 'joined_at')
+
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = 'Email'
+    user_email.admin_order_field = 'user__email'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

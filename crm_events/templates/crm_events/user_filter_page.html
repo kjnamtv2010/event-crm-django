@@ -25,6 +25,7 @@
             padding: 5px 10px;
             border-radius: 3px;
             transition: background-color 0.3s ease;
+            font-size: 15px;
         }
         .top-menu a:hover {
             background-color: #e0e0e0;
@@ -123,6 +124,7 @@
             <a href="{% url 'user-filter-ui' %}">User List</a>
             <a href="/admin/crm_events/event/add/">Create New Event</a>
             <a href="/admin/crm_events/event/">Manage Events</a>
+            <a href="/admin/crm_events/eventparticipation/">Events Participation</a>
             <a href="{% url 'email-status-tracker' %}">Email Tracker</a>
             <a href="/admin/">Admin Dashboard</a>
             <a href="{% url 'utm-analysis-api' %}">UTM Data List (UI)</a>
