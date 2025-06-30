@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_event_email_with_encrypted_link(event_obj, request_obj, user_email, user_id):
+    event_obj.refresh_from_db()
     event_slug = event_obj.slug
     current_host = request_obj.get_host()
     scheme = 'https' if request_obj.is_secure() else 'http'
@@ -47,7 +48,6 @@ def send_bulk_event_emails(subject, body_template, users, event_slug=None, sende
     if event_slug:
         try:
             event_obj = Event.objects.get(slug=event_slug)
-            event_obj.refresh_from_db()
         except Event.DoesNotExist:
             raise ValueError("Event not found.")
 
