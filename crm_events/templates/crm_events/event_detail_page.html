@@ -107,22 +107,22 @@
             width: fit-content;
             margin: 0 auto 8px auto; /* Center labels above inputs */
         }
-        .management-form input[type="email"] {
-            width: calc(100% - 40px);
-            max-width: 400px;
-            padding: 12px 15px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 1em;
-            box-sizing: border-box;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-        .management-form input[type="email"]:focus {
-            border-color: #007bff;
-            box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);
-            outline: none;
-        }
+<!--        .management-form input[type="email"] {-->
+<!--            width: calc(100% - 40px);-->
+<!--            max-width: 400px;-->
+<!--            padding: 12px 15px;-->
+<!--            margin-bottom: 20px;-->
+<!--            border: 1px solid #ccc;-->
+<!--            border-radius: 6px;-->
+<!--            font-size: 1em;-->
+<!--            box-sizing: border-box;-->
+<!--            transition: border-color 0.3s ease, box-shadow 0.3s ease;-->
+<!--        }-->
+<!--        .management-form input[type="email"]:focus {-->
+<!--            border-color: #007bff;-->
+<!--            box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);-->
+<!--            outline: none;-->
+<!--        }-->
 
         /* Checkbox Group */
         .management-form .checkbox-group {
@@ -282,7 +282,7 @@
         <div class="management-form">
             <h2>Manage User Roles for Event</h2>
             <p>Enter user's email and select their role (check to add, uncheck to remove):</p>
-            <input type="email" id="user-email-management" placeholder="Enter user's email..." />
+            <input type="hidden" id="token-management" value="{{ token }}">
             <div class="checkbox-group">
                 <label class="checkbox-wrapper">
                     Host
@@ -304,10 +304,6 @@
     <script>
         const eventSlug = "{{ event.slug }}";
 
-        /**
-         * Generates a simple UUID v4.
-         * @returns {string} A UUID string.
-         */
         function generateUUID() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 let r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -315,10 +311,6 @@
             });
         }
 
-        /**
-         * Retrieves or generates a session ID from localStorage.
-         * @returns {string} The unique session ID.
-         */
         function getSessionId() {
             let sessionId = localStorage.getItem('session_id');
             if (!sessionId) {
@@ -328,10 +320,6 @@
             return sessionId;
         }
 
-        /**
-         * Extracts query parameters from the current URL.
-         * @returns {object} An object containing the query parameters.
-         */
         function getQueryParams() {
             const params = {};
             const urlSearchParams = new URLSearchParams(window.location.search);
@@ -339,6 +327,10 @@
                 params[key] = value;
             }
             return params;
+        }
+        function getTokenFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get("token");
         }
 
         // Get UTM tracking data and session ID when the page loads
@@ -379,11 +371,6 @@
         }
 
         $(document).ready(function() {
-            /**
-             * Retrieves a CSRF token from the document cookies.
-             * @param {string} name - The name of the cookie to retrieve (e.g., 'csrftoken').
-             * @returns {string|null} The CSRF token value, or null if not found.
-             */
             function getCookie(name) {
                 let cookieValue = null;
                 if (document.cookie && document.cookie !== '') {
@@ -398,10 +385,11 @@
                 }
                 return cookieValue;
             }
-
+            const token = getTokenFromQuery();
+            $('#token-management').val(token);
             // Handle click event for the "Submit User Role" button
             $('#submit-management-action').on('click', function() {
-                const email = $('#user-email-management').val();
+                const token = $('#token-management').val();
                 const isHost = $('#checkbox-host-management').is(':checked');
                 const isAttend = $('#checkbox-attend-management').is(':checked');
 
@@ -409,10 +397,6 @@
                 $('#form-message-management').hide().removeClass('success error').text('');
 
                 // Basic frontend validation
-                if (!email) {
-                    $('#form-message-management').text("Please enter a user email.").addClass('error').show();
-                    return;
-                }
                 if (!isHost && !isAttend) {
                     $('#form-message-management').text("Please select at least one role (Host or Attend).").addClass('error').show();
                     return;
@@ -420,7 +404,7 @@
 
                 // Combine form data with UTM tracking data
                 const postData = {
-                    email: email,
+                    token: token,
                     is_host: isHost,
                     is_attend: isAttend,
                     ...utmTrackingData // Add UTM parameters to the payload

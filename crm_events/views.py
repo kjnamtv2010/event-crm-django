@@ -1,12 +1,8 @@
 import json
 import logging
-from urllib.parse import urlencode
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from django.http import JsonResponse
-from django.conf import settings
-from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
 from django.views.generic import DetailView, TemplateView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
@@ -23,12 +19,12 @@ from .serializers import (
     EventManageUserActionSerializer,
     EventSerializer,
 )
-from .services import (
+from crm_events.services.services import (
     apply_user_filters, get_filter_applies,
     filter_email_logs, filter_and_sort_utm_records,
-    manage_event_user_role,
-    record_utm_data_for_event_role_change
+    handle_event_user_registration
 )
+from crm_events.services.email_services import send_bulk_event_emails
 
 logger = logging.getLogger(__name__)
 
@@ -75,9 +71,6 @@ class CustomUserFilterView(APIView):
     """
 
     def get(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handles GET requests to retrieve filtered and paginated user data.
-        """
         queryset = CustomUser.objects.all()
         query_params = request.query_params
 
@@ -133,203 +126,82 @@ class EventListView(APIView):
     """
 
     def get(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handles GET requests to retrieve all events, ordered by start time.
-        """
         events = Event.objects.all().order_by('start_at')
         serializer = EventSerializer(events, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class SendEmailsView(APIView):
-    """
-    API endpoint for sending emails to filtered users.
-
-    Supports linking emails to an event and including UTM parameters.
-    """
-
-    def post(self, request: Any, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handles POST requests to send emails based on user filters.
-        """
+    def post(self, request, *args, **kwargs):
         serializer = EmailSendSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
 
         subject = validated_data['subject']
-        plain_body_content = validated_data['body']
+        body = validated_data['body']
         event_slug = validated_data.get('event_slug')
-        sender_user = CustomUser.objects.filter(
-            is_superuser=True, is_active=True, username='admin'
-        ).last()
 
-        queryset = CustomUser.objects.all()
-        queryset = apply_user_filters(queryset, validated_data)
-        recipient_list = [user.email for user in queryset if user.email]
+        sender_user = CustomUser.objects.filter(is_superuser=True, is_active=True, username='admin').last()
+        queryset = apply_user_filters(CustomUser.objects.all(), validated_data)
+        users = [user for user in queryset if user.email]
 
-        if not recipient_list:
-            logger.info("No users found matching the filter criteria for email sending. No emails sent.")
-            return Response(
-                {"message": "No users found matching the filter criteria. No emails sent."},
-                status=status.HTTP_200_OK
-            )
-
-        event_obj: Optional[Event] = None
-        if event_slug:
-            try:
-                event_obj = Event.objects.get(slug=event_slug)
-                current_host = request.get_host()
-                scheme = 'https' if request.is_secure() else 'http'
-                base_domain_with_scheme = f"{scheme}://{current_host}"
-                event_page_path = reverse('event-detail-page', kwargs={'slug': event_slug})
-                base_url = base_domain_with_scheme.rstrip('/') + event_page_path
-
-                utm_params = {
-                    'utm_source': "crm_email",
-                    'utm_medium': "email",
-                    'utm_campaign': f"event_{event_slug.replace('-', '_')}",
-                    'utm_content': "textlink"
-                }
-                event_link = f"{base_url}?{urlencode(utm_params)}"
-
-                plain_body_content = plain_body_content.replace('{event_link}', event_link) \
-                                                     if '{event_link}' in plain_body_content else \
-                                                     f"{plain_body_content}\n\nFind more details here: {event_link}"
-
-            except Event.DoesNotExist:
-                logger.error(f"Event with slug '{event_slug}' not found for email, despite serializer validation.")
-                return Response({"message": "Internal server error: Linked event not found."},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            except Exception as e:
-                logger.exception(f"Error building event link for slug '{event_slug}': {e}")
-                return Response({"message": f"Error processing event link: {e}"},
-                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        email_log = EmailLog(
-            subject=subject,
-            body=plain_body_content,
-            filters_applied=get_filter_applies(validated_data),
-            recipients=json.dumps(recipient_list),
-            sent_by=sender_user,
-            num_recipients=len(recipient_list),
-            status='PENDING',
-            event=event_obj
-        )
-        email_log.save()
+        if not users:
+            return Response({"message": "No users found matching filter criteria."}, status=status.HTTP_200_OK)
 
         try:
-            email_kwargs = {
-                'subject': subject,
-                'message': plain_body_content,
-                'from_email': settings.DEFAULT_FROM_EMAIL,
-                'recipient_list': recipient_list,
-                'fail_silently': False,
-            }
+            num_success, total = send_bulk_event_emails(
+                subject=subject,
+                body_template=body,
+                users=users,
+                event_slug=event_slug,
+                sender_user=sender_user,
+                filters_applied=get_filter_applies(validated_data),
+                request=request
+            )
+        except ValueError as e:
+            return Response({"message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-            num_sent = send_mail(**email_kwargs)
-
-            email_log.num_sent_successfully = num_sent
-            if num_sent == len(recipient_list):
-                email_log.status = 'SUCCESS'
-            elif num_sent > 0:
-                email_log.status = 'PARTIAL_SUCCESS'
-            else:
-                email_log.status = 'FAILED'
-            email_log.save()
-            logger.info(f"Successfully initiated sending emails to {len(recipient_list)} recipients. {num_sent} sent. Log ID: {email_log.id}")
-            return Response({
-                "message": f"Emails sent successfully to {num_sent} recipients.",
-                "recipients_count": len(recipient_list),
-                "sent_count": num_sent
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            email_log.status = 'FAILED'
-            email_log.error_message = str(e)
-            email_log.save()
-            logger.exception(f"Failed to send emails. Error: {e}")
-            return Response({"error": f"Failed to send emails: {str(e)}"},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({
+            "message": f"Emails sent. {num_success} out of {total} succeeded.",
+            "sent_count": num_success,
+            "recipients_count": total
+        }, status=status.HTTP_200_OK)
 
 
 class EventDetailAndRegisterView(APIView):
-    """
-    API endpoint for retrieving detailed event information and for managing
-    a user's role (host/attendee) within an event.
-    """
-
-    def get(self, request: Any, slug: str, *args: Any, **kwargs: Any) -> Response:
+    def get(self, request, slug, *args, **kwargs):
         event = get_object_or_404(Event, slug=slug)
         serializer = EventDetailAndRegisterSerializer(event)
         return Response(serializer.data)
 
-    def post(self, request: Any, slug: str, *args: Any, **kwargs: Any) -> Response:
-        """
-        Handles POST requests to manage a user's role (host/attendee) for an event.
-
-        Includes logic for recording UTM data and handling capacity limits.
-        """
+    def post(self, request, slug, *args, **kwargs):
         event = get_object_or_404(Event, slug=slug)
 
         serializer = EventManageUserActionSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user = serializer.user_to_manage
-        desired_is_host = serializer.validated_data.get('is_host', False)
-        desired_is_attend = serializer.validated_data.get('is_attend', False)
-
-        current_participation = event.eventparticipations.filter(user=user).first()
-        is_already_participating = bool(current_participation)
-
-        if event.max_capacity is not None and event.max_capacity > 0:
-            if not is_already_participating and (desired_is_host or desired_is_attend):
-                current_total_participants = event.eventparticipations.count()
-                if current_total_participants >= event.max_capacity:
-                    return Response(
-                        {"message": "Event has reached its maximum capacity. Cannot add new participants."},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+        is_host = serializer.validated_data.get('is_host', False)
+        is_attend = serializer.validated_data.get('is_attend', False)
 
         utm_data_fields = {
             k: v for k, v in serializer.validated_data.items()
-            if k.startswith('utm_') or k == 'session_id' and v is not None and v != ''
+            if (k.startswith('utm_') or k == 'session_id') and v
         }
-        has_utm_params = bool(utm_data_fields)
 
-        role_management_result = manage_event_user_role(
+        result = handle_event_user_registration(
             event=event,
             user=user,
-            desired_is_host=desired_is_host,
-            desired_is_attend=desired_is_attend
+            is_host=is_host,
+            is_attend=is_attend,
+            utm_data_fields=utm_data_fields
         )
 
-        messages = role_management_result['messages']
-        status_code = role_management_result['status_code']
-        actual_role_change_performed = role_management_result['actual_role_change_performed']
-        final_role_change_type = role_management_result['final_role_change_type']
-        user_status_updated = role_management_result['current_status']
-
-        if actual_role_change_performed and final_role_change_type and has_utm_params:
-            utm_record_result = record_utm_data_for_event_role_change(
-                user=user,
-                event=event,
-                role_change_type=final_role_change_type,
-                utm_data_fields=utm_data_fields
-            )
-            messages.append(utm_record_result['message'])
-        elif actual_role_change_performed and not has_utm_params:
-            messages.append("Role changed, but no UTM data provided to record.")
-        elif not actual_role_change_performed and not messages:
-            messages.append("No actual role change was performed.")
-
-
-        event.refresh_from_db()
-        updated_event_data = EventDetailAndRegisterSerializer(event).data
-
         return Response({
-            "message": " ".join(messages),
-            "user_status_updated": user_status_updated,
-            "event_data": updated_event_data
-        }, status=status_code)
+            "message": " ".join(result["messages"]),
+            "user_status_updated": result["user_status_updated"],
+            "event_data": result["updated_event_data"]
+        }, status=result["status_code"])
 
 
 class UTMAnalysisView(TemplateView):

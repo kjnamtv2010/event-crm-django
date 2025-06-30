@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+import pytz
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,7 +31,7 @@ DEBUG = True
 ALLOWED_HOSTS = ['54.153.241.10', 'localhost', '127.0.0.1']
 
 AUTH_USER_MODEL = 'crm_events.CustomUser'
-
+TIMEZONE = pytz.timezone('Asia/Ho_Chi_Minh')
 
 # Application definition
 

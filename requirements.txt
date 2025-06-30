@@ -13,3 +13,4 @@ python-decouple==3.8
 python-dotenv
 django-extensions
 python-dotenv==1.0.0
+cryptography==45.0.4

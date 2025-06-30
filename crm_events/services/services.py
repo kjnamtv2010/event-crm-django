@@ -1,7 +1,8 @@
 import logging
 from django.db import transaction
 from django.db.models import Count, Q
-from .models import CustomUser, Event, EventParticipation, UTMData
+from crm_events.models import CustomUser, Event, EventParticipation, UTMData
+from crm_events.serializers import EventDetailAndRegisterSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -261,8 +262,7 @@ def manage_event_user_role(event, user, desired_is_host, desired_is_attend):
     }
 
 
-def record_utm_data_for_event_role_change(user: CustomUser, event: Event, role_change_type: str,
-                                         utm_data_fields: dict) -> dict:
+def record_utm_data_for_event_role_change(user, event, role_change_type, utm_data_fields):
     """
     Records UTM data for a user's role change related to an event.
     Returns a dictionary with success status and a message.
@@ -283,3 +283,60 @@ def record_utm_data_for_event_role_change(user: CustomUser, event: Event, role_c
         message = f"Failed to record UTM data: {e}."
         logger.error(f"Error creating UTMData for {user.email}: {e}")
         return {'success': False, 'message': message}
+
+
+
+def handle_event_user_registration(event, user, is_host, is_attend, utm_data_fields):
+    """
+    Handles business logic of registering a user as host/attendee,
+    respecting event capacity and optionally recording UTM data.
+    """
+    is_already_participating = EventParticipation.objects.filter(event=event, user=user).exists()
+
+    # Check event capacity
+    if event.max_capacity is not None and event.max_capacity > 0:
+        if not is_already_participating and (is_host or is_attend):
+            current_total_participants = event.eventparticipations.count()
+            if current_total_participants >= event.max_capacity:
+                return {
+                    "messages": ["Event has reached its maximum capacity. Cannot add new participants."],
+                    "status_code": 400,
+                    "user_status_updated": None,
+                    "updated_event_data": None
+                }
+
+    role_result = manage_event_user_role(
+        event=event,
+        user=user,
+        desired_is_host=is_host,
+        desired_is_attend=is_attend
+    )
+
+    messages = role_result["messages"]
+    actual_role_change_performed = role_result["actual_role_change_performed"]
+    final_role_change_type = role_result["final_role_change_type"]
+    status_code = role_result["status_code"]
+    user_status_updated = role_result["current_status"]
+
+    if actual_role_change_performed and final_role_change_type and utm_data_fields:
+        utm_result = record_utm_data_for_event_role_change(
+            user=user,
+            event=event,
+            role_change_type=final_role_change_type,
+            utm_data_fields=utm_data_fields
+        )
+        messages.append(utm_result["message"])
+    elif actual_role_change_performed and not utm_data_fields:
+        messages.append("Role changed, but no UTM data provided to record.")
+    elif not actual_role_change_performed and not messages:
+        messages.append("No actual role change was performed.")
+
+    event.refresh_from_db()
+    updated_event_data = EventDetailAndRegisterSerializer(event).data
+
+    return {
+        "messages": messages,
+        "status_code": status_code,
+        "user_status_updated": user_status_updated,
+        "updated_event_data": updated_event_data
+    }

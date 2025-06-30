@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from .models import Event, CustomUser
+from .token_utils import decrypt_event_token
 
 User = get_user_model()
 
@@ -128,11 +129,8 @@ class EventDetailAndRegisterSerializer(serializers.ModelSerializer):
 
 
 class EventManageUserActionSerializer(serializers.Serializer):
-    """
-    Serializer for managing a user's role (host/attendee) for an event,
-    including capturing UTM parameters.
-    """
-    email = serializers.EmailField(help_text="Email of the user to perform action on.")
+    token = serializers.CharField(required=True, help_text="Encrypted token for identifying user and expiry.")
+
     is_host = serializers.BooleanField(default=False, help_text="Set user as Host.")
     is_attend = serializers.BooleanField(default=False, help_text="Set user as Attendee.")
 
@@ -146,20 +144,24 @@ class EventManageUserActionSerializer(serializers.Serializer):
     user_to_manage = None
 
     def validate(self, data):
-        user_email_input = data.get('email')
-        if not user_email_input:
-            raise serializers.ValidationError({"email": "User email is required."})
+        token = data.get("token")
+        email, user_id, expiry_dt = decrypt_event_token(token)
+
+        if not email or not user_id:
+            raise serializers.ValidationError("Invalid or expired token/ expired event")
 
         try:
-            self.user_to_manage = User.objects.get(email__iexact=user_email_input)
+            self.user_to_manage = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            raise serializers.ValidationError({"email": "User with this email not found."})
+            raise serializers.ValidationError("User not found for given token.")
 
         if data.get('is_host') and data.get('is_attend'):
             raise serializers.ValidationError(
-                "A user cannot be both a Host and an Attendee simultaneously.")
+                "A user cannot be both a Host and an Attendee simultaneously."
+            )
 
         return data
+
 
 
 class SimpleUserSerializer(serializers.ModelSerializer):
