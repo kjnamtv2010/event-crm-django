@@ -93,17 +93,12 @@ pip install -r requirements.txt
 #### Option 1: Using `psql` shell
 
 ```bash
-psql -U postgres
-```
-then
-```sql
 sudo -u postgres psql -c "CREATE DATABASE eventcrmdb;"
-sudo -u postgres psql -c "CREATE USER postgres WITH PASSWORD 'postgres';"
+sudo -u postgres psql -c \"CREATE USER postgres WITH PASSWORD 'postgres';\"
 sudo -u postgres psql -c "ALTER ROLE postgres SET client_encoding TO 'utf8';"
 sudo -u postgres psql -c "ALTER ROLE postgres SET default_transaction_isolation TO 'read committed';"
 sudo -u postgres psql -c "ALTER ROLE postgres SET timezone TO 'UTC';"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE eventcrmdb TO postgres;"
-
 ```
 
 ### 4.6 Update `config/settings.py`
