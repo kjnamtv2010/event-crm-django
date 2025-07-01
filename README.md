@@ -32,20 +32,46 @@ _Link to project video demonstration will be added here._
 
 ```text
 event-crm-django/
-├── venv/                      # Python virtual environment
-├── config/                    # Django project configuration (settings, urls, wsgi, asgi)
+├── config/
+│   ├── __init__.py
+│   ├── asgi.py
 │   ├── settings.py
-│   └── wsgi.py
-├── crm_events/                # Main Django app for event management
-│   ├── migrations/
-│   ├── models.py
-│   ├── views.py
 │   ├── urls.py
-│   └── ...
+│   └── wsgi.py
+│
+├── crm_events/
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── forms.py
+│   ├── models.py
+│   ├── serializers.py
+│   ├── tests.py
+│   ├── token_utils.py
+│   ├── urls.py
+│   ├── views.py
+│   ├── migrations/
+│   ├── scripts/
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── email_services.py
+│   │   └── services.py
+│   ├── static/
+│   └── templates/
+│
+├── staticfiles/
+│   ├── admin/
+│   ├── crm_events/
+│   ├── django_extensions/
+│   └── rest_framework/
+│
+├── .venv/
+│   └── .env
+├── .gitignore
 ├── manage.py
-├── requirements.txt
-├── staticfiles/               # Collected static files (CSS, JS, images)
-└── README.md
+├── README.md
+└── requirements.txt
+
 ```
 
 ## 3. Technologies Used
