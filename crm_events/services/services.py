@@ -1,7 +1,7 @@
 import logging
 from django.db import transaction
 from django.db.models import Count, Q
-from crm_events.models import CustomUser, Event, EventParticipation, UTMData
+from crm_events.models import EventParticipation, UTMData
 from crm_events.serializers import EventDetailAndRegisterSerializer
 
 logger = logging.getLogger(__name__)
@@ -221,7 +221,7 @@ def manage_event_user_role(event, user, desired_is_host, desired_is_attend):
                 final_role_change_type = 'host'
             else:
                 messages.append(f"'{user.email}' is already a Host (no change needed).")
-                actual_role_change_performed = False # Không thay đổi nếu đã tồn tại
+                actual_role_change_performed = False
 
         elif desired_is_attend:
             current_attendee_count = EventParticipation.objects.filter(event=event, role='attendee').count()
@@ -236,7 +236,7 @@ def manage_event_user_role(event, user, desired_is_host, desired_is_attend):
                 final_role_change_type = 'attendee'
             else:
                 messages.append(f"'{user.email}' is already an Attendee (no change needed).")
-                actual_role_change_performed = False # Không thay đổi nếu đã tồn tại
+                actual_role_change_performed = False
         else:
             if actual_role_change_performed and not final_role_change_type:
                 final_role_change_type = 'unregistered'
